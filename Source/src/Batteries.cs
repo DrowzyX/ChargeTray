@@ -15,6 +15,7 @@ sealed class BatteryReader {
     internal string[] HardwareDiagnostics { get; private set; } = [];
     private readonly RazerReceiver[] _razer = RazerModels.Receivers.Select(m => new RazerReceiver(m)).ToArray();
     private readonly AulaF108 _aula = new();
+    private readonly XentaReceiver _xenta = new();
     internal bool RetryAulaSoon => _aula.RetrySoon;
     private readonly Dictionary<string, (DateTime Next, int? Value, string? Model)> _ble = new();
     private static readonly SemaphoreSlim RadioReads = new(3);
@@ -39,6 +40,7 @@ sealed class BatteryReader {
             catch { return (r.Model, Result: (Receiver: false, Percent: (int?)null, Details: "")); }
         }).ToArray();
         var aulaTask = _aula.Read(force, hid.Any(AulaF108.IsKnownInput));
+        var xentaTask = _xenta.Read(force);
         var classic = BluetoothDevices(false, force);
         var ble = BluetoothDevices(true, force);
         await Task.WhenAll(classic, ble);
@@ -82,8 +84,15 @@ sealed class BatteryReader {
         try { aula = await aulaTask; }
         catch (Exception e) { Errors.Add($"AULA HID: {e.GetType().Name}"); }
         HardwareDiagnostics = hid.Select(x => x.Diagnostic).Distinct().ToArray();
+        var xenta = await xentaTask;
+        if (xenta.Found) HardwareDiagnostics = [..HardwareDiagnostics, $"Xenta 2.4 ГГц | 1D57:FA60 | {xenta.Details}"];
+        var reserved = razerIds.Concat(aula.Receiver ? new[] { AulaF108.Id } : Array.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (xenta.Found) reserved.Add("1D57:FA60");
+        connected.AddRange(CommunityDevices.Identify(hid, reserved));
+        if (xenta.Found) connected.Add(new("xenta:1d57:fa60", "Беспроводная мышь (1D57:FA60)", DeviceType.Mouse,
+            xenta.Level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет подтверждённого заряда", xenta.Level));
         connected.AddRange(hid.Where(x => x.Transport != "Bluetooth HID" && x.Percent.HasValue &&
-            !razerIds.Contains(x.Hardware) &&
+            !razerIds.Contains(x.Hardware) && !CommunityDevices.Known(x) &&
             !(aula.Receiver && AulaF108.IsKnownInput(x)))
             .Select(x => new Accessory("hid:" + x.Instance, x.Name, x.Type, x.Transport, x.Percent)));
         foreach (var (model, razer) in razers) {
