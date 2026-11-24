@@ -11,6 +11,8 @@ internal static class AccentTheme {
     private static readonly string SettingFile = Path.Combine(SettingsDir, "accent-v1.txt");
     private static Color _color = Color.FromArgb(226, 197, 160);
     private static bool _rgb;
+    private static int _cycleSeconds = 9;
+    internal static int CycleSeconds => _cycleSeconds;
     internal static Color Accent => _rgb ? Rainbow(Environment.TickCount64) : _color;
     internal static bool RgbEnabled => _rgb;
     internal static Color Fixed => _color;
@@ -22,6 +24,7 @@ internal static class AccentTheme {
             if (lines.Length == 0) return;
             if (TryParse(lines[0], out var color)) _color = color;
             _rgb = lines.Length > 1 && lines[1] == "rgb";
+            if (lines.Length > 2 && int.TryParse(lines[2], out int seconds)) _cycleSeconds = Math.Clamp(seconds, 4, 30);
         } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
@@ -41,6 +44,7 @@ internal static class AccentTheme {
         Save();
     }
     internal static void SetRgb(bool enabled) { _rgb = enabled; Save(); }
+    internal static void SetCycleSeconds(int seconds) { _cycleSeconds = Math.Clamp(seconds, 4, 30); Save(); }
     internal static void Reset() {
         _color = Color.FromArgb(226, 197, 160);
         _rgb = false;
@@ -50,13 +54,14 @@ internal static class AccentTheme {
     private static void Save() {
         try {
             Directory.CreateDirectory(SettingsDir);
-            File.WriteAllLines(SettingFile, new[] { $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}", _rgb ? "rgb" : "solid" });
+            File.WriteAllLines(SettingFile, new[] { $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}", _rgb ? "rgb" : "solid", _cycleSeconds.ToString() });
         } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
     internal static Color Rainbow(long milliseconds) {
         // Smooth ~9-second hue cycle, not rapid flashing.
-        double hue = (milliseconds % 9000L) / 9000.0 * 6.0;
+        long duration = _cycleSeconds * 1000L;
+        double hue = (milliseconds % duration) / (double)duration * 6.0;
         int section = (int)hue;
         double fraction = hue - section;
         double x = 1 - Math.Abs((hue % 2) - 1);
