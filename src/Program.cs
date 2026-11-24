@@ -229,11 +229,11 @@ sealed class TrayApp : ApplicationContext {
             if (_poll.Interval != interval) _poll.Interval = interval;
             _rawData = next;
             var oldKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var oldReadings = _data.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
             _data = _prefs.Apply(next);
             if (_seenFirstScan && _prefs.Values.ConnectionNotifications) {
-                var previously = _data.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
                 var charging = _data.Where(d => d.Charging &&
-                    (!previously.TryGetValue(d.Key, out var prior) || !prior.Charging)).Take(2).ToArray();
+                    (!oldReadings.TryGetValue(d.Key, out var prior) || !prior.Charging)).Take(2).ToArray();
                 if (charging.Length > 0)
                     _main.ShowBalloonTip(3500, "ChargeTray · зарядка",
                         string.Join("\n", charging.Select(d => "⚡ Заряжается: " + Trim(d.Name, 35))),
