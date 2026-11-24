@@ -70,6 +70,7 @@ sealed class TrayApp : ApplicationContext {
         _demo = demo;
         _panel = new BatteryPanel();
         _island.MonitorIndex = _prefs.Values.IslandMonitor;
+        _island.TopOffset = _prefs.Values.IslandTopOffset;
         _updateTimer.Tick += async (_, _) => await CheckUpdatesQuietly();
         _panel.RefreshRequested += async () => await Refresh(true);
         _strip.OpenPanel += () => Open(44);
@@ -283,10 +284,13 @@ sealed class TrayApp : ApplicationContext {
             _hub.RefreshRequested += async () => await Refresh(true);
             _hub.MonitorChanged += index => {
                 _island.MonitorIndex = index;
+                _island.TopOffset = _prefs.Values.IslandTopOffset;
                 RenderTray();
             };
             _hub.PreferencesChanged += () => {
                 _data = _prefs.Apply(_rawData);
+                _island.TopOffset = _prefs.Values.IslandTopOffset;
+                _island.UpdateIsland(_positionMode == "top", _data);
                 _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
                 _updateTimer.Enabled = _prefs.Values.CheckUpdates && !_demo;
                 RenderTray();
