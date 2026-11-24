@@ -400,7 +400,7 @@ internal sealed class DeviceHubForm : Form {
             v => _settings.Values.EconomyMode = v);
         _settingsList.Controls.Add(battery);
 
-        var monitor = Group("Dynamic Island 2.1", "Укажите монитор, на котором появится островок.", 168);
+        var monitor = Group("Dynamic Island 2.1", "Монитор и отступ островка от верхнего края.", 215);
         var selected = Math.Clamp(_settings.Values.IslandMonitor, 0, Math.Max(0, Screen.AllScreens.Length - 1));
         var chooser = new FluentButton(ScreenLabel(selected)) { Left = 22, Top = 92,
             Width = 338, Height = 40 };
@@ -419,6 +419,18 @@ internal sealed class DeviceHubForm : Form {
             menu.Show(chooser, new Point(0, chooser.Height));
         };
         monitor.Controls.Add(chooser);
+        monitor.Controls.Add(Label("Отступ сверху (px)", 25, 149, 184, 24, 10));
+        var offset = new NumericUpDown {
+            Left = 212, Top = 143, Width = 86, Minimum = 0, Maximum = 120,
+            Value = Math.Clamp(_settings.Values.IslandTopOffset, 0, 120),
+            BackColor = FluentStyle.SurfaceHover, ForeColor = FluentStyle.Text
+        };
+        offset.ValueChanged += (_, _) => {
+            _settings.Values.IslandTopOffset = (int)offset.Value;
+            _settings.Save();
+            PreferencesChanged?.Invoke();
+        };
+        monitor.Controls.Add(offset);
         _settingsList.Controls.Add(monitor);
 
         var updates = Group("Обновления", "Скачивание только из официального GitHub-репозитория.", 196);
