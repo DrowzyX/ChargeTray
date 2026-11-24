@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32;
@@ -35,6 +36,9 @@ sealed class TrayApp : ApplicationContext {
     private readonly ChargeStrip _strip = new();
     private readonly ChargeIsland _island = new();
     private readonly ToolStripMenuItem _extra = new("Отдельный значок для каждого устройства");
+    private readonly ToolStripMenuItem _colors = new("Оформление и RGB");
+    private readonly ToolStripMenuItem _rgbItem = new("Плавная RGB-анимация");
+    private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 50 };
     private readonly Dictionary<string, (NotifyIcon Tray, Icon Icon, string Signature)> _icons = new();
     private readonly LowBatteryAlerts _alerts = new();
     private readonly System.Windows.Forms.Timer _poll = new() { Interval = 20_000 };
@@ -55,6 +59,7 @@ sealed class TrayApp : ApplicationContext {
     private string _positionMode = "top";
 
     public TrayApp(bool demo) {
+        AccentTheme.Load();
         _demo = demo;
         _panel = new BatteryPanel();
         _panel.RefreshRequested += async () => await Refresh(true);
@@ -91,6 +96,14 @@ sealed class TrayApp : ApplicationContext {
         _menu.Items.Add("Обновить", null, async (_, _) => await Refresh(true));
         _menu.Items.Add(_position);
         _menu.Items.Add(_extra);
+        SetupThemeMenu();
+        _menu.Items.Add(_colors);
+        _themeTimer.Tick += (_, _) => {
+            if (_panel.Visible) _panel.Invalidate();
+            if (_island.Visible) _island.Invalidate();
+            if (_strip.Visible) _strip.Invalidate();
+        };
+        _themeTimer.Enabled = AccentTheme.RgbEnabled;
         if (!demo) {
             _menu.Items.Add(_startupItem);
             _menu.Opening += (_, _) => SyncStartupMenu();
@@ -99,6 +112,21 @@ sealed class TrayApp : ApplicationContext {
         }
         if (demo) _menu.Items.Add("Проверить уведомление", null, (_, _) =>
             _main.ShowBalloonTip(5000, "Демо · пора зарядить мышь", "Logitech MX Master 3S — 12%", ToolTipIcon.Warning));
+        var diagnostics = new ToolStripMenuItem("Диагностика и поддержка");
+        diagnostics.DropDownItems.Add("Скопировать краткий отчёт", null, (_, _) => CopyDiagnostics());
+        diagnostics.DropDownItems.Add("Скопировать отчёт для разработчика", null,
+            async (_, _) => await CopyDeveloperDiagnostics());
+        diagnostics.DropDownItems.Add(new ToolStripSeparator());
+        diagnostics.DropDownItems.Add("Сообщить о новом устройстве (GitHub)", null, (_, _) => {
+            try {
+                Process.Start(new ProcessStartInfo("https://github.com/DrowzyX/ChargeTray/issues/new") {
+                    UseShellExecute = true
+                });
+            } catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) {
+                _main.ShowBalloonTip(4000, "ChargeTray", "Не удалось открыть GitHub.", ToolTipIcon.Warning);
+            }
+        });
+        _menu.Items.Add(diagnostics);
         _menu.Items.Add("Скопировать диагностику", null, (_, _) => CopyDiagnostics());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("Выход", null, (_, _) => ExitThread());
@@ -257,19 +285,84 @@ sealed class TrayApp : ApplicationContext {
     private static string? Label(Accessory? d) => d?.Percent is int p ? p.ToString() + "%" : d?.Low == true ? "!" : null;
     private static string Signature(Accessory? d, bool light, int size) => $"{d?.Type}:{Label(d)}:{d?.Low}:{light}:{size}";
 
-    private void CopyDiagnostics() {
-        var version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
-        var text = new StringBuilder($"ChargeTray {version}").AppendLine()
-            .AppendLine(Environment.OSVersion.VersionString)
-            .AppendLine($"Последний опрос: {_updated?.ToString("HH:mm:ss") ?? "—"}");
-        foreach (var d in _data) text.AppendLine($"{d.Name} | {d.Model ?? "—"} | {d.Type} | {d.Via} | {d.Reading}");
-        if (_hardware.Length > 0) {
-            text.AppendLine().AppendLine("Windows: клавиатуры, мыши и геймпады (без серийных номеров)");
-            foreach (var line in _hardware) text.AppendLine(line);
+    private static string Version => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
+    private void CopyDiagnostics() =>
+        CopyText(DiagnosticReport.Summary(Version, Environment.OSVersion.VersionString, _updated, _data, _errors));
+
+    private async Task CopyDeveloperDiagnostics() {
+        try {
+            _main.ShowBalloonTip(1500, "ChargeTray", "Собираем сведения HID без серийных номеров…", ToolTipIcon.Info);
+            var items = await Task.Run(() => {
+                var inputs = HidInput.Read();
+                var ids = inputs.Select(x => x.Hardware).Where(x =>
+                    x.Length == 9 && x[4] == ':').Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var paths = RazerReceiver.PresentInterfaces(p => ids.Any(id =>
+                    p.Contains("vid_" + id[..4] + "&pid_" + id[5..], StringComparison.OrdinalIgnoreCase)));
+                var caps = paths.Take(72).Select(path => {
+                    using var handle = RazerReceiver.Open(path, 0);
+                    return (Path: path, Caps: RazerReceiver.GetCaps(handle));
+                }).ToArray();
+                return DiagnosticReport.Developer(Version, Environment.OSVersion.VersionString,
+                    _updated, _data, _hardware, _errors, inputs, caps);
+            });
+            if (!_exiting) CopyText(items);
+        } catch (Exception e) {
+            if (!_exiting) _main.ShowBalloonTip(4000, "ChargeTray",
+                "Отчёт HID недоступен: " + e.GetType().Name, ToolTipIcon.Warning);
         }
-        foreach (var e in _errors) text.AppendLine(e);
-        try { Clipboard.SetText(text.ToString()); _main.ShowBalloonTip(3000, "ChargeTray", "Диагностика скопирована.", ToolTipIcon.Info); }
-        catch (ExternalException) { _main.ShowBalloonTip(3000, "ChargeTray", "Буфер обмена занят. Попробуйте ещё раз.", ToolTipIcon.Info); }
+    }
+
+    private void CopyText(string value) {
+        try {
+            Clipboard.SetText(value);
+            _main.ShowBalloonTip(2500, "ChargeTray", "Диагностика скопирована.", ToolTipIcon.Info);
+        } catch (ExternalException) {
+            _main.ShowBalloonTip(3000, "ChargeTray", "Буфер обмена занят. Попробуйте ещё раз.", ToolTipIcon.Warning);
+        }
+    }
+
+    private void SetupThemeMenu() {
+        _colors.DropDownItems.Add("Выбрать любой цвет…", null, (_, _) => {
+            using var picker = new ColorDialog { Color = AccentTheme.Fixed, FullOpen = true, AnyColor = true };
+            if (picker.ShowDialog() == DialogResult.OK) {
+                AccentTheme.SetColor(picker.Color);
+                RefreshTheme();
+            }
+        });
+        var presets = new (string Label, Color Value)[] {
+            ("Шампань", Color.FromArgb(226, 197, 160)),
+            ("Лазурный", Color.FromArgb(70, 174, 245)),
+            ("Фиолетовый", Color.FromArgb(185, 129, 245)),
+            ("Розовый", Color.FromArgb(242, 130, 174)),
+            ("Бирюзовый", Color.FromArgb(70, 219, 201)),
+            ("Белый", Color.FromArgb(245, 245, 245))
+        };
+        foreach (var preset in presets) {
+            var color = preset.Value;
+            _colors.DropDownItems.Add(preset.Label, null, (_, _) => {
+                AccentTheme.SetColor(color);
+                RefreshTheme();
+            });
+        }
+        _colors.DropDownItems.Add(new ToolStripSeparator());
+        _colors.DropDownItems.Add(_rgbItem);
+        _rgbItem.Click += (_, _) => {
+            AccentTheme.SetRgb(!AccentTheme.RgbEnabled);
+            RefreshTheme();
+        };
+        _colors.DropDownItems.Add("Сбросить оформление", null, (_, _) => {
+            AccentTheme.Reset();
+            RefreshTheme();
+        });
+        _colors.DropDownOpening += (_, _) => _rgbItem.Checked = AccentTheme.RgbEnabled;
+    }
+
+    private void RefreshTheme() {
+        _themeTimer.Enabled = AccentTheme.RgbEnabled;
+        _panel.Invalidate();
+        _strip.Invalidate();
+        _island.Invalidate();
     }
 
     private static string Trim(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
@@ -284,6 +377,7 @@ sealed class TrayApp : ApplicationContext {
         _exiting = true;
         Application.Idle -= FirstIdle;
         _poll.Dispose();
+        _themeTimer.Dispose();
         _reader.Dispose();
         foreach (var i in _icons.Values) { i.Tray.Dispose(); i.Icon.Dispose(); }
         _main.Dispose(); _mainIcon?.Dispose();
