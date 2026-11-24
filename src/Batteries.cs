@@ -138,7 +138,7 @@ sealed class BatteryReader : IDisposable {
         }
         if (!aula.Receiver) { _aulaWasConnected = false; _aulaPower.Reset(); }
         if (WindowsBattery.Read() is { } batteryDevice) connected.Add(batteryDevice);
-        var candidates = vendorBridgeEnabled
+        IEnumerable<BatteryObservation> candidates = vendorBridgeEnabled
             ? new VendorJsonSource().Read(DateTime.UtcNow) : [];
         return BatterySourceResolver.Resolve(MergeControllers(connected), candidates, DateTime.UtcNow)
             .OrderBy(d => d.Type).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
