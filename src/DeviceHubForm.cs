@@ -15,6 +15,7 @@ internal sealed class DeviceHubForm : Form {
     private readonly Dictionary<string, Panel> _pages = new();
     private readonly Dictionary<string, FluentButton> _nav = new();
     private readonly FlowLayoutPanel _deviceList = NewFlow();
+    private readonly TableLayoutPanel _deviceLayout = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty, Padding = Padding.Empty };
     private readonly FlowLayoutPanel _historyList = NewFlow();
     private readonly FlowLayoutPanel _styleList = NewFlow();
     private readonly FlowLayoutPanel _settingsList = NewFlow();
@@ -45,7 +46,7 @@ internal sealed class DeviceHubForm : Form {
         _settings = settings;
         _history = history;
         AutoScaleMode = AutoScaleMode.Dpi;
-        Text = "ChargeTray 2.1 — Device Hub";
+        Text = "ChargeTray " + typeof(DeviceHubForm).Assembly.GetName().Version?.ToString(3) + " — Device Hub";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(760, 565);
         Size = new Size(1040, 725);
@@ -72,7 +73,7 @@ internal sealed class DeviceHubForm : Form {
         var brand = UiElements.Label("CHARGE", 17, true);
         brand.SetBounds(19, 19, 152, 32);
         _sidebar.Controls.Add(brand);
-        var brandSub = UiElements.Label("TRAY 2.1", 9, muted: true);
+        var brandSub = UiElements.Label("TRAY " + typeof(DeviceHubForm).Assembly.GetName().Version?.ToString(3), 9, muted: true);
         brandSub.SetBounds(21, 50, 145, 23);
         _sidebar.Controls.Add(brandSub);
         AddNavigation("devices", "Устройства", "▣", 112);
@@ -90,23 +91,21 @@ internal sealed class DeviceHubForm : Form {
         // Give the status strip and the scrolling cards distinct layout rows.
         // A Top-docked label layered over a Fill-docked FlowLayoutPanel clipped
         // the first card on high-DPI Windows 11.
-        var devicePage = Page("devices", new Panel { Dock = DockStyle.Fill });
-        devicePage.Controls.Clear();
-        var deviceLayout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
-            Margin = Padding.Empty, Padding = Padding.Empty,
-            BackColor = FluentStyle.Background
-        };
-        deviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        deviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-        deviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        // Keep all nested device surfaces under theme control. The prior
+        // anonymous TableLayoutPanel retained the old light BackColor when
+        // switching to dark theme, leaving a large white rectangle.
+        var devicePage = Page("devices", _deviceLayout);
+        _deviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _deviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        _deviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _deviceLayout.BackColor = FluentStyle.Background;
         _deviceStatus.Dock = DockStyle.Fill;
         _deviceStatus.Height = 42;
         _deviceStatus.Padding = new Padding(20, 11, 0, 0);
+        _deviceStatus.BackColor = FluentStyle.Background;
         _deviceList.Dock = DockStyle.Fill;
-        deviceLayout.Controls.Add(_deviceStatus, 0, 0);
-        deviceLayout.Controls.Add(_deviceList, 0, 1);
-        devicePage.Controls.Add(deviceLayout);
+        _deviceLayout.Controls.Add(_deviceStatus, 0, 0);
+        _deviceLayout.Controls.Add(_deviceList, 0, 1);
         Page("history", _historyList);
         Page("appearance", _styleList);
         Page("settings", _settingsList);
@@ -490,7 +489,7 @@ internal sealed class DeviceHubForm : Form {
             v => _settings.Values.EconomyMode = v);
         _settingsList.Controls.Add(battery);
 
-        var monitor = Group("Dynamic Island 2.1", "Монитор и отступ островка от верхнего края.", 215);
+        var monitor = Group("Dynamic Island", "Монитор и отступ островка от верхнего края.", 215);
         var selected = Math.Clamp(_settings.Values.IslandMonitor, 0, Math.Max(0, Screen.AllScreens.Length - 1));
         var chooser = new FluentButton(ScreenLabel(selected)) { Left = 22, Top = 92,
             Width = 338, Height = 40 };
@@ -715,6 +714,9 @@ internal sealed class DeviceHubForm : Form {
         _header.BackColor = FluentStyle.Background;
         _content.BackColor = FluentStyle.Background;
         foreach (var page in _pages.Values) page.BackColor = FluentStyle.Background;
+        _deviceLayout.BackColor = FluentStyle.Background;
+        _deviceStatus.BackColor = FluentStyle.Background;
+        _deviceStatus.ForeColor = FluentStyle.Muted;
         foreach (var flow in new[] {_deviceList,_historyList,_styleList,_settingsList,_diagnosticsList,_labList}) {
             flow.BackColor = FluentStyle.Background;
             foreach (Control card in flow.Controls) {
