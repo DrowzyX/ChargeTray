@@ -247,10 +247,12 @@ sealed class TrayApp : ApplicationContext {
                 // from an unverified charge estimate on a 2.4 GHz dongle.
                 var aulaNow = _data.FirstOrDefault(d => d.Key == "aula:f108-pro");
                 if (aulaNow is not null && oldReadings.TryGetValue(aulaNow.Key, out var aulaPrev)) {
-                    bool usbNow = aulaNow.Detail?.StartsWith("USB подключён", StringComparison.Ordinal) == true;
-                    bool usbBefore = aulaPrev.Detail?.StartsWith("USB подключён", StringComparison.Ordinal) == true;
-                    bool risingNow = aulaNow.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
-                    bool risingBefore = aulaPrev.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
+                    bool usbNow = aulaNow.UsbConnected;
+                    bool usbBefore = aulaPrev.UsbConnected;
+                    bool risingNow = aulaNow.Detail?.Contains("возможно заряжается", StringComparison.OrdinalIgnoreCase) == true ||
+                        aulaNow.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
+                    bool risingBefore = aulaPrev.Detail?.Contains("возможно заряжается", StringComparison.OrdinalIgnoreCase) == true ||
+                        aulaPrev.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
                     if (usbNow && !usbBefore) {
                         _main.ShowBalloonTip(4000, "ChargeTray · AULA F108 Pro",
                             "USB-кабель обнаружен. Зарядка батареи не подтверждена.", ToolTipIcon.Info);
