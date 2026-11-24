@@ -175,4 +175,16 @@ Verify(usbKeyboard.UsbConnected && !usbKeyboard.Charging && usbKeyboard.IsStale,
 var personalized = new SettingsStore().Apply([usbKeyboard]);
 Verify(personalized.Length == 1 && personalized[0].UsbConnected && !personalized[0].Charging,
     "Custom device names preserve the independent USB status");
+Verify(DeviceCatalog.TryGet("062A:38CC", out var combo) && 
+    combo.Type == "Keyboard", "Generic 062A:38CC combo receiver is recognized");
+Verify(DeviceCatalog.TryGet("A8A5:2255", out var yjx) &&
+    yjx.Type == "Mouse", "YJX A8A5:2255 receiver is classified as mouse");
+byte[] unknownXenta = [0x03, 0x00, 0x40, 0xF3, 0x0A];
+Verify(XentaBatteryPacket.Percent(unknownXenta) is null,
+    "Unverified Xenta F3 status never reports 10 percent");
+Verify(XentaBatteryPacket.RejectionReason(unknownXenta).Contains("0xF3") &&
+    XentaBatteryPacket.RejectionReason(unknownXenta).Contains("0x0A"),
+    "Xenta diagnostic explains the unrecognized F3 status");
+Verify(XentaBatteryPacket.RejectionReason([0x03, 0x55, 0x40, 0x01, 62])
+    .Contains("валидный"), "Valid Xenta packet is recognized");
 Console.WriteLine($"{assertions} checks passed.");

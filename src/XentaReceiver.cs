@@ -80,7 +80,7 @@ internal sealed class XentaReceiver : IDisposable {
                             }
                         } else if (XentaBatteryPacket.Percent(buffer) is null) {
                             SetDetailIfEmpty(generation, "пакет заряда не найден; последний HID: " +
-                                Convert.ToHexString(buffer));
+                                Convert.ToHexString(buffer) + " · " + XentaBatteryPacket.RejectionReason(buffer));
                         }
                     }
                 }

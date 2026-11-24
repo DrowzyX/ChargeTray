@@ -1,0 +1,50 @@
+name: Publish ChargeTray 2.1.5 Community Device Identification Preview
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-2.1.5.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: charge-tray-2-1-5-preview
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content src/ChargeTray.csproj
+          if ($project.Project.PropertyGroup.Version -ne '2.1.5') { throw 'Unexpected project version' }
+      - name: Run regression tests
+        shell: pwsh
+        run: dotnet run --project tests/BatteryLogic.Tests.csproj -c Release
+      - name: Publish Windows x64 executable
+        shell: pwsh
+        run: dotnet publish src/ChargeTray.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+      - name: ZIP application
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath ChargeTray-2.1.5-preview-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChargeTray-2.1.5-preview-win-x64
+          path: ChargeTray-2.1.5-preview-win-x64.zip
+      - name: Create preview Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v2.1.5-preview.1 --repo "${{ github.repository }}" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists' }
+          gh release create v2.1.5-preview.1 ChargeTray-2.1.5-preview-win-x64.zip --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "ChargeTray 2.1.5 — Community Device Identification Preview" --notes-file RELEASE-NOTES-2.1.5.md --prerelease

@@ -12,6 +12,8 @@ internal static class DeviceCatalog {
         ["28DE:1304"] = new() { Name = "Steam Controller Wireless Receiver", Type = "Controller" },
         ["1E7D:30F7"] = new() { Name = "ROCCAT Vulcan Pro", Type = "Keyboard" },
         ["258A:0049"] = new() { Name = "Gaming Keyboard (258A:0049)", Type = "Keyboard" },
+        ["062A:38CC"] = new() { Name = "2.4G Keyboard/Mouse Receiver (062A:38CC)", Type = "Keyboard" },
+        ["A8A5:2255"] = new() { Name = "YJX Wireless Mouse Receiver (A8A5:2255)", Type = "Mouse" },
         ["1D57:FA60"] = new() { Name = "Беспроводная мышь (1D57:FA60)", Type = "Mouse" },
         ["05AC:024F"] = new() { Name = "AULA F108 Pro", Type = "Keyboard" },
         ["1532:0083"] = new() { Name = "Razer Basilisk X HyperSpeed", Type = "Mouse" }
