@@ -161,7 +161,9 @@ sealed class BatteryPanel : Form {
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
         float h = Height / _scale;
         var background = new RectangleF(0, 0, W, h);
-        using var wash = new LinearGradientBrush(background, Color.FromArgb(39, 37, 37), Color.FromArgb(18, 18, 21), 65f);
+        var tone = AccentTheme.Accent;
+        var tinted = Color.FromArgb((tone.R + 39 * 7) / 8, (tone.G + 37 * 7) / 8, (tone.B + 37 * 7) / 8);
+        using var wash = new LinearGradientBrush(background, tinted, Color.FromArgb(18, 18, 21), 65f);
         g.FillRectangle(wash, background);
         using var border = new Pen(Color.FromArgb(95, AccentTheme.Accent));
         using var frame = Shapes.Round(new RectangleF(.5f, .5f, W - 1, h - 1), 22);
