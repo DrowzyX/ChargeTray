@@ -146,4 +146,25 @@ Verify(AccentTheme.SystemAccentEnabled && !AccentTheme.RgbEnabled,
 AccentTheme.Reset();
 Verify(!AccentTheme.SystemAccentEnabled && !AccentTheme.RgbEnabled,
     "Reset restores previous default appearance");
+var chargeTracker = new AulaPowerTracker();
+var t0 = new DateTime(2026, 11, 24, 10, 0, 0, DateTimeKind.Utc);
+chargeTracker.Observe(35, false, t0);
+chargeTracker.Observe(35, false, t0.AddSeconds(50));
+Verify(!chargeTracker.LikelyCharging, "Constant battery level cannot prove charging");
+chargeTracker.Observe(36, false, t0.AddMinutes(3));
+Verify(!chargeTracker.LikelyCharging, "Single rise must not trigger charging estimate");
+chargeTracker.Observe(37, false, t0.AddMinutes(6));
+Verify(chargeTracker.LikelyCharging, "Two spaced rises allow cautious charging estimate");
+chargeTracker.Observe(37, true, t0.AddMinutes(7));
+Verify(chargeTracker.LikelyCharging, "Stale report cannot increase charging evidence");
+chargeTracker.Observe(36, false, t0.AddMinutes(9));
+Verify(!chargeTracker.LikelyCharging, "Decrease clears tentative charging estimate");
+chargeTracker.Observe(37, false, t0.AddMinutes(10));
+chargeTracker.Observe(38, false, t0.AddMinutes(12));
+chargeTracker.Observe(38, false, t0.AddMinutes(45));
+Verify(!chargeTracker.LikelyCharging, "Old increase evidence eventually expires");
+chargeTracker.Reset();
+Verify(!chargeTracker.LikelyCharging, "Disconnect resets power inference");
+chargeTracker.Observe(100, false, t0.AddMinutes(46));
+Verify(!chargeTracker.LikelyCharging, "Full battery is not proof of ongoing charging");
 Console.WriteLine($"{assertions} checks passed.");
