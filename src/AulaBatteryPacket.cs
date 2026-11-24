@@ -30,6 +30,16 @@ internal static class AulaBatteryPacket {
         return percent is >= 1 and <= 100 ? percent : null;
     }
 
+    // Diagnostic only: bytes following the validated battery percentage may
+    // carry model-specific status, but no charging bit is currently confirmed.
+    // Record a short, bounded fingerprint for controlled cable/no-cable tests.
+    public static string? StatusFingerprint(ReadOnlySpan<byte> bytes) {
+        if (Percent(bytes) is null) return null;
+        if (bytes[0] == 0) bytes = bytes[1..];
+        return "AULA status[4..11]=" + Convert.ToHexString(bytes.Slice(4, 8)) +
+            " (raw; charging flag not verified)";
+    }
+
     public static string DescribeFrame(ReadOnlySpan<byte> bytes) {
         var positions = new List<string>();
         for (int i = 0; i < Math.Min(64, bytes.Length); i++)

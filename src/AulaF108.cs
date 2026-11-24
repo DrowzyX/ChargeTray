@@ -91,8 +91,11 @@ internal sealed class AulaF108 {
                         for (int i = 0; i < 12; i++) {
                             int count = await pendingRead;
                             if (count <= 0) break;
-                            if (AulaBatteryPacket.Percent(reply.AsSpan(0, count)) is int p)
-                                return (true, p, $"{p}% · ответ ресивера");
+                            if (AulaBatteryPacket.Percent(reply.AsSpan(0, count)) is int p) {
+                                var status = AulaBatteryPacket.StatusFingerprint(reply.AsSpan(0, count));
+                                return (true, p, $"{p}% · ответ ресивера" +
+                                    (status is null ? "" : " · " + status));
+                            }
                             if (AulaBatteryPacket.IsBatteryFrame(reply.AsSpan(0, count)))
                                 rejected = AulaBatteryPacket.DescribeFrame(reply.AsSpan(0, count));
                             if (i < 11) pendingRead = stream.ReadAsync(reply.AsMemory(), timeout.Token);

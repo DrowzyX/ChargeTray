@@ -104,6 +104,14 @@ sealed class BatteryReader : IDisposable {
         }
         if (aula.Receiver) {
             HardwareDiagnostics = [..HardwareDiagnostics, $"AULA 2.4 ГГц | {AulaF108.Name} | {AulaF108.Id} | {aula.Details}"];
+            // Some F108 Pro keyboards expose 0C45:800A in USB data mode.
+            // Presence of that HID interface means a USB connection, NOT
+            // verified battery charging (power-only cables are invisible).
+            var wired = RazerReceiver.PresentInterfaces(p =>
+                p.StartsWith(@"\\?\hid#vid_0c45&pid_800a", StringComparison.OrdinalIgnoreCase));
+            HardwareDiagnostics = [..HardwareDiagnostics, "AULA USB data cable | " +
+                (wired.Length > 0 ? "detected 0C45:800A; charging is unconfirmed" :
+                    "not visible to Windows; power-only cable cannot be detected")];
             int? level = aula.Percent ?? hid.FirstOrDefault(x => AulaF108.IsKnownInput(x) && x.Percent.HasValue)?.Percent;
             connected.Add(new("aula:f108-pro", AulaF108.Name, DeviceType.Keyboard,
                 aula.Stale ? "Донгл 2,4 ГГц · последнее показание" :

@@ -81,12 +81,26 @@ internal sealed class DeviceHubForm : Form {
         sidebarFooter.Padding = new Padding(19, 7, 0, 0);
         _sidebar.Controls.Add(sidebarFooter);
 
-        _deviceStatus.Dock = DockStyle.Top;
-        _deviceStatus.Height = 38;
-        _deviceStatus.Padding = new Padding(12, 10, 0, 0);
-        var devicePage = Page("devices", _deviceList);
-        devicePage.Controls.Add(_deviceStatus);
-        _deviceStatus.BringToFront();
+        // Give the status strip and the scrolling cards distinct layout rows.
+        // A Top-docked label layered over a Fill-docked FlowLayoutPanel clipped
+        // the first card on high-DPI Windows 11.
+        var devicePage = Page("devices", new Panel { Dock = DockStyle.Fill });
+        devicePage.Controls.Clear();
+        var deviceLayout = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            Margin = Padding.Empty, Padding = Padding.Empty,
+            BackColor = FluentStyle.Background
+        };
+        deviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        deviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        deviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _deviceStatus.Dock = DockStyle.Fill;
+        _deviceStatus.Height = 42;
+        _deviceStatus.Padding = new Padding(20, 11, 0, 0);
+        _deviceList.Dock = DockStyle.Fill;
+        deviceLayout.Controls.Add(_deviceStatus, 0, 0);
+        deviceLayout.Controls.Add(_deviceList, 0, 1);
+        devicePage.Controls.Add(deviceLayout);
         Page("history", _historyList);
         Page("appearance", _styleList);
         Page("settings", _settingsList);
@@ -209,7 +223,7 @@ internal sealed class DeviceHubForm : Form {
         card.Controls.Add(Label(Icon(d.Type), 20, 15, 35, 31, 18, true));
         var name = Label(d.Name, 63, 16, 420, 31, 13, true);
         card.Controls.Add(name);
-        card.Controls.Add(Label(d.Type + "  ·  " + d.Via + (d.Charging ? "  ·  ⚡ Заряжается" : ""),
+        card.Controls.Add(Label(d.Type + "  ·  " + d.Via + (d.Charging ? "  ·  ⚡ Заряжается" : d.Key == "aula:f108-pro" ? "  ·  Зарядка: статус неизвестен" : ""),
             64, 48, 510, 24, 9, muted: true));
         var percent = Label(d.Reading, 505, 17, 115, 33, 18, true);
         percent.TextAlign = ContentAlignment.TopRight;
