@@ -223,12 +223,13 @@ internal sealed class DeviceHubForm : Form {
         card.Controls.Add(new DeviceGlyphIcon(d.Type) { Left = 19, Top = 16, Width = 38, Height = 38 });
         var name = Label(d.Name, 73, 16, 410, 31, 13, true);
         card.Controls.Add(name);
-        var connection = Label(d.Type + "  ·  " + d.Via, 74, 46, 510, 22, 9, muted: true);
+        var connection = Label(d.Type + "  ·  " + d.Via + (d.UsbConnected ? "  ·  USB подключён" : ""), 74, 46, 510, 22, 9, muted: true);
         card.Controls.Add(connection);
         if (d.Charging || d.Key == "aula:f108-pro") {
             var status = Label(d.Charging ? "⚡ Заряжается (подтверждено устройством)" :
                 (d.Detail ?? "Статус зарядки неизвестен"), 74, 68, 510, 20, 9, muted: true);
             status.ForeColor = d.Charging ? Color.FromArgb(115, 230, 166) :
+                d.UsbConnected ? AccentTheme.Accent :
                 d.Detail?.StartsWith("⚡?") == true ? AccentTheme.Accent : FluentStyle.Muted;
             card.Controls.Add(status);
             card.Resize += (_, _) => status.Width = Math.Max(180, card.ClientSize.Width - 95);
