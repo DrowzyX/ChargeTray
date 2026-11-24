@@ -40,7 +40,13 @@ sealed class TrayApp : ApplicationContext {
     private readonly ToolStripMenuItem _rgbItem = new("Плавная RGB-анимация");
     private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 50 };
     private readonly Dictionary<string, (NotifyIcon Tray, Icon Icon, string Signature)> _icons = new();
-    private readonly LowBatteryAlerts _alerts = new();
+    private readonly HashSet<string> _customAlerted = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SettingsStore _prefs = new();
+    private readonly BatteryHistory _history = new();
+    private DeviceHubForm? _hub;
+    private Accessory[] _rawData = [];
+    private bool _seenFirstScan;
+    private readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 4 * 60 * 60 * 1000 };
     private readonly System.Windows.Forms.Timer _poll = new() { Interval = 20_000 };
     private readonly BatteryReader _reader = new();
     private readonly BatteryPanel _panel;
@@ -62,6 +68,8 @@ sealed class TrayApp : ApplicationContext {
         AccentTheme.Load();
         _demo = demo;
         _panel = new BatteryPanel();
+        _island.MonitorIndex = _prefs.Values.IslandMonitor;
+        _updateTimer.Tick += async (_, _) => await CheckUpdatesQuietly();
         _panel.RefreshRequested += async () => await Refresh(true);
         _strip.OpenPanel += () => Open(44);
         _island.OpenPanel += point => {
@@ -92,6 +100,7 @@ sealed class TrayApp : ApplicationContext {
             } catch (IOException) { } catch (UnauthorizedAccessException) { }
             RenderTray();
         };
+        _menu.Items.Add("Центр устройств (Windows 11)", null, (_, _) => OpenHub());
         _menu.Items.Add("Открыть панель", null, (_, _) => Open());
         _menu.Items.Add("Обновить", null, async (_, _) => await Refresh(true));
         _menu.Items.Add(_position);
@@ -103,7 +112,7 @@ sealed class TrayApp : ApplicationContext {
             if (_island.Visible) _island.Invalidate();
             if (_strip.Visible) _strip.Invalidate();
         };
-        _themeTimer.Enabled = AccentTheme.RgbEnabled;
+        _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
         if (!demo) {
             _menu.Items.Add(_startupItem);
             _menu.Opening += (_, _) => SyncStartupMenu();
@@ -133,7 +142,12 @@ sealed class TrayApp : ApplicationContext {
         Hook(_main);
         RenderTray();
         _poll.Tick += async (_, _) => await Refresh(false);
-        if (!demo) _poll.Start();
+        if (!demo) {
+            _poll.Start();
+            if (_prefs.Values.CheckUpdates) {
+                _updateTimer.Start();
+            }
+        }
         // The first tick must run after Windows Forms establishes its UI context.
         Application.Idle += FirstIdle;
     }
@@ -180,6 +194,7 @@ sealed class TrayApp : ApplicationContext {
         Application.Idle -= FirstIdle;
         await Refresh(false);
         if (_demo && !_exiting) Open();
+        if (!_demo && _prefs.Values.CheckUpdates) _ = CheckUpdatesQuietly();
     }
 
     private void Hook(NotifyIcon tray) {
@@ -209,9 +224,25 @@ sealed class TrayApp : ApplicationContext {
             _hardware = _demo ? [] : _reader.HardwareDiagnostics;
             int interval = !_demo && _reader.RetryAulaSoon ? 8_000 : 20_000;
             if (_poll.Interval != interval) _poll.Interval = interval;
-            _data = next;
+            _rawData = next;
+            var oldKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _data = _prefs.Apply(next);
+            if (_seenFirstScan && _prefs.Values.ConnectionNotifications) {
+                var newKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var added = _data.Where(d => !oldKeys.Contains(d.Key)).Take(3).ToArray();
+                var removed = oldKeys.Where(k => !newKeys.Contains(k)).Take(3).ToArray();
+                if (added.Length > 0 || removed.Length > 0) {
+                    var summary = string.Join("\n", added.Select(d => "Подключено: " + Trim(d.Name, 40))
+                        .Concat(removed.Select(k => "Отключено: " + Trim(k, 32))));
+                    _main.ShowBalloonTip(4000, "ChargeTray · устройства", summary, ToolTipIcon.Info);
+                    _island.Pulse();
+                }
+            }
+            _seenFirstScan = true;
+            if (_prefs.Values.BatteryHistory) _history.Observe(_data);
             _updated = DateTime.Now;
             RenderTray();
+            if (_hub?.Visible == true) _hub.UpdateDevices(_data, _updated);
             if (!_demo) NotifyLow();
         } catch (Exception e) {
             if (_exiting) return;
@@ -226,11 +257,50 @@ sealed class TrayApp : ApplicationContext {
     }
 
     private void NotifyLow() {
-        var low = _alerts.Check(_data);
-        if (low.Length == 0) return;
-        string lines = string.Join("\n", low.Take(3).Select(d => $"{Trim(d.Name, 36)} — {d.Reading}"));
-        if (low.Length > 3) lines += $"\nЕщё устройств: {low.Length - 3}";
-        _main.ShowBalloonTip(5000, "Пора зарядить устройство", lines, ToolTipIcon.Warning);
+        if (!_prefs.Values.BatteryNotifications) return;
+        var low = new List<Accessory>();
+        foreach (var d in _data) {
+            if (d.IsStale || d.Charging) continue;
+            int threshold = _prefs.Threshold(d.Key);
+            bool lowNow = d.Percent is int p ? p < threshold : d.Level is Band.Low or Band.Empty;
+            if (lowNow && _customAlerted.Add(d.Key)) low.Add(d);
+            if (!lowNow) _customAlerted.Remove(d.Key);
+        }
+        if (low.Count == 0) return;
+        var description = string.Join("\n", low.Take(3).Select(d =>
+            Trim(d.Name, 34) + " — " + d.Reading + $" (порог {_prefs.Threshold(d.Key)}%)"));
+        _main.ShowBalloonTip(4500, "Пора зарядить устройство", description, ToolTipIcon.Warning);
+        _island.Pulse();
+    }
+
+    private void OpenHub() {
+        if (_hub is null || _hub.IsDisposed) {
+            _hub = new DeviceHubForm(_prefs, _history);
+            _hub.RefreshRequested += async () => await Refresh(true);
+            _hub.MonitorChanged += index => {
+                _island.MonitorIndex = index;
+                RenderTray();
+            };
+            _hub.PreferencesChanged += () => {
+                _data = _prefs.Apply(_rawData);
+                _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
+                _updateTimer.Enabled = _prefs.Values.CheckUpdates && !_demo;
+                RenderTray();
+            };
+        }
+        _hub.ShowHub();
+        _hub.UpdateDevices(_data, _updated);
+    }
+
+    private async Task CheckUpdatesQuietly() {
+        if (_exiting || _demo || !_prefs.Values.CheckUpdates) return;
+        try {
+            var release = await ReleaseUpdates.Check();
+            var version = typeof(Program).Assembly.GetName().Version ?? new Version(2,0);
+            if (release is not null && ReleaseUpdates.IsNewer(release.Tag, version))
+                _main.ShowBalloonTip(4500, "Доступно обновление ChargeTray",
+                    release.Tag + " — откройте Центр устройств → Настройки для скачивания.", ToolTipIcon.Info);
+        } catch (Exception) { /* Offline mode: no unnecessary notification */ }
     }
 
     private void RenderTray() {
@@ -359,7 +429,7 @@ sealed class TrayApp : ApplicationContext {
     }
 
     private void RefreshTheme() {
-        _themeTimer.Enabled = AccentTheme.RgbEnabled;
+        _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
         _panel.Invalidate();
         _strip.Invalidate();
         _island.Invalidate();
@@ -378,6 +448,8 @@ sealed class TrayApp : ApplicationContext {
         Application.Idle -= FirstIdle;
         _poll.Dispose();
         _themeTimer.Dispose();
+        _updateTimer.Dispose();
+        _hub?.Dispose();
         _reader.Dispose();
         foreach (var i in _icons.Values) { i.Tray.Dispose(); i.Icon.Dispose(); }
         _main.Dispose(); _mainIcon?.Dispose();
