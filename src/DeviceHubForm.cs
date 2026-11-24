@@ -223,7 +223,7 @@ internal sealed class DeviceHubForm : Form {
         card.Controls.Add(Label(Icon(d.Type), 20, 15, 35, 31, 18, true));
         var name = Label(d.Name, 63, 16, 420, 31, 13, true);
         card.Controls.Add(name);
-        card.Controls.Add(Label(d.Type + "  ·  " + d.Via + (d.Charging ? "  ·  ⚡ Заряжается" : d.Key == "aula:f108-pro" ? "  ·  Зарядка: статус неизвестен" : ""),
+        card.Controls.Add(Label(d.Type + "  ·  " + d.Via + (d.Charging ? "  ·  ⚡ Заряжается" : d.Key == "aula:f108-pro" ? "  ·  " + (d.Detail ?? "Статус зарядки неизвестен") : ""),
             64, 48, 510, 24, 9, muted: true));
         var percent = Label(d.Reading, 505, 17, 115, 33, 18, true);
         percent.TextAlign = ContentAlignment.TopRight;
