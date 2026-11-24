@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using Microsoft.Win32;
+using System.ComponentModel;
 
 namespace ChargeTray;
 
@@ -65,9 +66,9 @@ internal sealed class FluentCard : Panel {
 
 internal sealed class FluentButton : Control {
     private bool _over, _down;
-    internal bool Selected { get; set; }
-    internal bool Primary { get; set; }
-    internal string Symbol { get; set; } = "";
+    internal bool Selected;
+    internal bool Primary;
+    internal string Symbol = "";
     internal FluentButton(string text = "") {
         Text = text;
         Font = FluentStyle.Font(10);
@@ -107,6 +108,7 @@ internal sealed class FluentToggle : Control {
     private float _fraction;
     private readonly System.Windows.Forms.Timer _motion = new() { Interval = 16 };
     internal event Action<bool>? ValueChanged;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal bool Checked {
         get => _checked;
         set {
