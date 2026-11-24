@@ -1,14 +1,27 @@
 using System.Drawing.Drawing2D;
+using Microsoft.Win32;
 
 namespace ChargeTray;
 
 internal static class FluentStyle {
-    internal static readonly Color Background = Color.FromArgb(18, 21, 27);
-    internal static readonly Color Surface = Color.FromArgb(30, 34, 43);
-    internal static readonly Color SurfaceHover = Color.FromArgb(42, 47, 59);
-    internal static readonly Color Text = Color.FromArgb(244, 246, 251);
-    internal static readonly Color Muted = Color.FromArgb(158, 169, 188);
-    internal static readonly Color Border = Color.FromArgb(69, 75, 89);
+    private static string _mode = "dark";
+    internal static void SetTheme(string mode) =>
+        _mode = mode is "dark" or "light" or "system" ? mode : "dark";
+    internal static bool IsDark {
+        get {
+            if (_mode != "system") return _mode != "light";
+            try {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                return Convert.ToInt32(key?.GetValue("AppsUseLightTheme") ?? 0) == 0;
+            } catch { return true; }
+        }
+    }
+    internal static Color Background => IsDark ? Color.FromArgb(18, 21, 27) : Color.FromArgb(247, 248, 251);
+    internal static Color Surface => IsDark ? Color.FromArgb(30, 34, 43) : Color.FromArgb(255, 255, 255);
+    internal static Color SurfaceHover => IsDark ? Color.FromArgb(42, 47, 59) : Color.FromArgb(237, 240, 247);
+    internal static Color Text => IsDark ? Color.FromArgb(244, 246, 251) : Color.FromArgb(30, 35, 47);
+    internal static Color Muted => IsDark ? Color.FromArgb(158, 169, 188) : Color.FromArgb(96, 104, 118);
+    internal static Color Border => IsDark ? Color.FromArgb(69, 75, 89) : Color.FromArgb(217, 222, 232);
     internal static Font Font(float size = 10, bool bold = false) =>
         new("Segoe UI Variable", size, bold ? FontStyle.Bold : FontStyle.Regular);
 
