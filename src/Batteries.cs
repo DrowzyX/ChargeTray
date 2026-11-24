@@ -31,7 +31,7 @@ sealed class BatteryReader : IDisposable {
     private const string BatteryKey = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2";
     private static readonly string[] Props = [Address, Container, Class, Minor, Appearance, BatteryKey, "System.Devices.ModelName", IsConnected];
 
-    public async Task<Accessory[]> Read(bool force) {
+    public async Task<Accessory[]> Read(bool force, bool vendorBridgeEnabled = false) {
         Errors.Clear();
         HardwareDiagnostics = [];
         HidInput.Input[] hid = [];
@@ -138,7 +138,10 @@ sealed class BatteryReader : IDisposable {
         }
         if (!aula.Receiver) { _aulaWasConnected = false; _aulaPower.Reset(); }
         if (WindowsBattery.Read() is { } batteryDevice) connected.Add(batteryDevice);
-        return MergeControllers(connected).OrderBy(d => d.Type).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        IEnumerable<BatteryObservation> candidates = vendorBridgeEnabled
+            ? new VendorJsonSource().Read(DateTime.UtcNow) : [];
+        return BatterySourceResolver.Resolve(MergeControllers(connected), candidates, DateTime.UtcNow)
+            .OrderBy(d => d.Type).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
     private async Task<(DeviceInformation Info, bool Le)[]> BluetoothDevices(bool le, bool force) {

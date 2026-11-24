@@ -59,6 +59,7 @@ internal sealed class FluentCard : Panel {
     }
     protected override void OnPaintBackground(PaintEventArgs e) {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.Clear(FluentStyle.Background);
         FluentStyle.DrawRounded(e.Graphics, new Rectangle(1, 1, Width - 3, Height - 3),
             FluentStyle.Surface, 13);
     }
@@ -87,9 +88,9 @@ internal sealed class FluentButton : Control {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         Color accent = AccentTheme.Accent;
-        Color bg = !Enabled ? Color.FromArgb(37, 40, 47) :
-            Selected || Primary ? Color.FromArgb(49, 58, 74) :
-            _down ? Color.FromArgb(58, 65, 80) :
+        Color bg = !Enabled ? FluentStyle.SurfaceHover :
+            Selected || Primary ? (FluentStyle.IsDark ? Color.FromArgb(49, 58, 74) : Color.FromArgb(225, 234, 249)) :
+            _down ? (FluentStyle.IsDark ? Color.FromArgb(58, 65, 80) : Color.FromArgb(216, 225, 239)) :
             _over ? FluentStyle.SurfaceHover : FluentStyle.Surface;
         FluentStyle.DrawRounded(g, new Rectangle(1, 1, Width - 3, Height - 3), bg, 9);
         if (Selected) {
@@ -145,7 +146,8 @@ internal sealed class FluentToggle : Control {
             FluentStyle.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         var track = new Rectangle(Width - 59, (Height - 25) / 2, 49, 25);
         using (var p = FluentStyle.Round(track, 13))
-        using (var brush = new SolidBrush(_checked ? AccentTheme.Accent : Color.FromArgb(68, 74, 88))) g.FillPath(brush, p);
+        using (var brush = new SolidBrush(_checked ? AccentTheme.Accent :
+            FluentStyle.IsDark ? Color.FromArgb(68, 74, 88) : Color.FromArgb(200, 207, 221))) g.FillPath(brush, p);
         var thumbX = track.X + 4 + (int)Math.Round(24 * _fraction);
         using var thumb = new SolidBrush(_checked ? FluentStyle.Background : FluentStyle.Text);
         g.FillEllipse(thumb, thumbX, track.Y + 4, 17, 17);

@@ -17,6 +17,8 @@
     <Compile Include="../src/XentaFrameConfirmation.cs" Link="XentaFrameConfirmation.cs" />
     <Compile Include="../src/AccentTheme.cs" Link="AccentTheme.cs" />
     <Compile Include="../src/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../src/DeviceIntelligence.cs" Link="DeviceIntelligence.cs" />
+    <Compile Include="../src/ProtocolLab.cs" Link="ProtocolLab.cs" />
     <Compile Include="../src/BatteryHistory.cs" Link="BatteryHistory.cs" />
     <Compile Include="../src/DeviceCatalog.cs" Link="DeviceCatalog.cs" />
     <Compile Include="../src/HidInput.cs" Link="HidInput.cs" />
