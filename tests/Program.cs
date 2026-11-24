@@ -61,6 +61,16 @@ Verify(AulaBatteryPacket.Percent(capture.AsSpan(0, 32)) is null, "AULA truncated
 Verify(AulaBatteryPacket.IsBatteryFrame(aula) && AulaBatteryPacket.Percent(aula) is null, "AULA echoed request is not a reading");
 capture[4] = 60; capture[32] = 0x5d;
 Verify(AulaBatteryPacket.Percent(capture) == 60, "AULA 60% comes from the charge field");
+Verify(AulaBatteryPacket.StatusFingerprint(capture)?.Contains("AULA status[4..11]=0000000000000000") == true,
+    "AULA diagnostic samples validated status bytes without guessing charging");
+var capturedStatus = (byte[])capture.Clone();
+capturedStatus[5] = 0x02;
+capturedStatus[32] = 0x5f;
+Verify(AulaBatteryPacket.StatusFingerprint(capturedStatus)?.Contains("0200000000000000") == true,
+    "AULA status sample exposes potential cable changes for follow-up comparison");
+capturedStatus[32] = 0;
+Verify(AulaBatteryPacket.StatusFingerprint(capturedStatus) is null,
+    "Bad checksum never leaks an unvalidated AULA status sample");
 capture[4] = 1; capture[32] = 0x22;
 Verify(AulaBatteryPacket.Percent(capture) == 1, "AULA 1% remains available for alerts");
 capture[32] = 0xff;
