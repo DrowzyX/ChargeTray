@@ -277,12 +277,17 @@ internal sealed class DeviceHubForm : Form {
             pref.AlertThreshold = (int)threshold.Value; _settings.Save(); PreferencesChanged?.Invoke();
         };
         card.Controls.Add(threshold);
+        var sourceCaption = Label("Источник: " + (d.ReadingSource ?? "Windows / HID") +
+            (d.ReadingAtUtc is DateTime stamp ? " · " + stamp.ToLocalTime().ToString("HH:mm:ss") : ""),
+            370, 168, 215, 24, 8, muted: true);
+        card.Controls.Add(sourceCaption);
         card.Resize += (_, _) => {
             percent.Left = card.ClientSize.Width - 150;
             bar.Width = card.ClientSize.Width - 46;
             name.Width = Math.Max(160, card.ClientSize.Width - 260);
             connection.Width = Math.Max(180, card.ClientSize.Width - 95);
             threshold.Left = 271;
+            sourceCaption.Width = Math.Max(85, card.ClientSize.Width - 389);
         };
         return card;
     }
