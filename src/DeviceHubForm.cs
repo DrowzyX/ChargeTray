@@ -308,6 +308,14 @@ internal sealed class DeviceHubForm : Form {
             UpdateThemeImmediately();
         };
         accent.Controls.Add(picker);
+        var systemAccent = new FluentButton("Акцент Windows") {
+            Left = 295, Top = 88, Width = 200, Height = 40
+        };
+        systemAccent.Click += (_, _) => {
+            AccentTheme.SetSystemAccent(true);
+            UpdateThemeImmediately();
+        };
+        accent.Controls.Add(systemAccent);
         var presets = new (string Name, Color Value)[] {
             ("Шампань", Color.FromArgb(226,197,160)), ("Лазурный", Color.FromArgb(70,174,245)),
             ("Фиолетовый", Color.FromArgb(185,129,245)), ("Розовый", Color.FromArgb(242,130,174)),
@@ -530,6 +538,10 @@ internal sealed class DeviceHubForm : Form {
     }
     private void ApplyThemeToWindow() {
         BackColor = FluentStyle.Background;
+        try {
+            int dark = FluentStyle.IsDark ? 1 : 0;
+            _ = DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int));
+        } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
         _sidebar.BackColor = FluentStyle.Background;
         _header.BackColor = FluentStyle.Background;
         _content.BackColor = FluentStyle.Background;
