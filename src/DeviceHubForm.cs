@@ -299,7 +299,7 @@ internal sealed class DeviceHubForm : Form {
     }
     private void BuildAppearance() {
         _styleList.Controls.Clear();
-        var accent = Group("RGB и цветовой акцент", "Прежняя подсветка ChargeTray полностью сохранена.", 226);
+        var accent = Group("RGB и цветовой акцент", "Прежняя подсветка ChargeTray полностью сохранена.", 255);
         var picker = new FluentButton("Выбрать любой цвет…") { Symbol = "◈", Left = 20, Top = 88,
             Width = 254, Height = 40 };
         picker.Click += (_, _) => {
@@ -322,17 +322,17 @@ internal sealed class DeviceHubForm : Form {
             ("Фиолетовый", Color.FromArgb(185,129,245)), ("Розовый", Color.FromArgb(242,130,174)),
             ("Бирюзовый", Color.FromArgb(70,219,201)), ("Белый", Color.FromArgb(245,245,245))
         };
-        var palette = new FlowLayoutPanel { Top = 137, Left = 20, Width = 610, Height = 46,
-            FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
+        var palette = new FlowLayoutPanel { Top = 137, Left = 20, Width = 610, Height = 90,
+            FlowDirection = FlowDirection.LeftToRight, WrapContents = true,
             BackColor = FluentStyle.Surface };
         foreach (var swatch in presets) {
-            var b = new FluentButton("● " + swatch.Name) { Size = new Size(94, 34), Font = FluentStyle.Font(8) };
+            var b = new FluentButton("● " + swatch.Name) { Size = new Size(93, 34), Font = FluentStyle.Font(8) };
             var color = swatch.Value;
             b.Click += (_, _) => { AccentTheme.SetColor(color); UpdateThemeImmediately(); };
             palette.Controls.Add(b);
         }
         accent.Controls.Add(palette);
-        accent.Resize += (_, _) => palette.Width = Math.Max(450, accent.Width - 41);
+        accent.Resize += (_, _) => palette.Width = Math.Max(360, accent.Width - 41);
         _styleList.Controls.Add(accent);
 
         var animation = Group("Плавная подсветка", "Живая анимация оттенков без обновления батареи.", 227);
