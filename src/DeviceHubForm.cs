@@ -505,8 +505,7 @@ internal sealed class DeviceHubForm : Form {
         } catch (Exception e) {
             MessageBox.Show(this, "Обновление не удалось: " + e.GetType().Name, "ChargeTray");
         } finally {
-            button.Enabled = true;
-            button.Text = "Проверить обновления";
+            if (!button.IsDisposed) { button.Enabled = true; button.Text = "Проверить обновления"; }
         }
     }
     private void BuildDiagnostics() {
@@ -547,7 +546,7 @@ internal sealed class DeviceHubForm : Form {
             "appearance" => _styleList, "settings" => _settingsList, _ => _diagnosticsList
         };
         foreach (Control c in flow.Controls) {
-            if (c is not FluentCard card) continue;
+            if (c is not FluentCard card || card.Bottom < 0 || card.Top > flow.ClientSize.Height) continue;
             card.Invalidate();
             foreach (Control sub in card.Controls) {
                 if (sub is BatteryProgress or BatteryChart or FluentToggle or FluentButton) sub.Invalidate();
