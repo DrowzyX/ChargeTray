@@ -206,7 +206,10 @@ sealed class BatteryPanel : Form {
             DrawText(g, d.Name, 79, y + 10, 209, 15, white, FontStyle.Bold);
             string model = !string.IsNullOrWhiteSpace(d.Model) && !d.Model.Equals(d.Name, StringComparison.OrdinalIgnoreCase)
                 ? $"{d.Model} · {d.Via}" : $"{TypeLabel(d.Type)} · {d.Via}";
-            if (d.Charging) model = "Заряжается · " + model;
+            if (d.Charging) model = "⚡ Заряжается · " + model;
+            else if (d.UsbConnected) model = "USB подключён · зарядка не подтверждена";
+            else if (d.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true)
+                model = "⚡? Вероятно заряжается · " + model;
             DrawText(g, model, 79, y + 34, 281, 11, muted);
             DrawText(g, d.Reading, 290, y + 10, 89, d.Percent.HasValue ? 23 : 12,
                 d.IsStale ? muted : d.Low ? accent : d.HasCurrentReading ? white : muted, FontStyle.Bold, true);
