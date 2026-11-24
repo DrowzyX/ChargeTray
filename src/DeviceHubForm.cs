@@ -366,7 +366,12 @@ internal sealed class DeviceHubForm : Form {
         _styleList.Controls.Add(animation);
 
         var other = Group("Режим оформления", "Оформление сохраняется при следующем запуске.", 160);
-        var theme = new FluentButton("Тёмная тема Windows 11") { Left = 20, Top = 86, Width = 276 };
+        var themeText = _settings.Values.ThemeMode switch {
+            "light" => "Светлая — Windows 11",
+            "system" => "Автоматически по Windows",
+            _ => "Тёмная тема Windows 11"
+        };
+        var theme = new FluentButton(themeText) { Left = 20, Top = 86, Width = 276 };
         theme.Click += (_, _) => {
             var menu = new ContextMenuStrip();
             menu.Closed += (_, _) => menu.Dispose();
@@ -543,6 +548,10 @@ internal sealed class DeviceHubForm : Form {
             _ = DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int));
         } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
         _sidebar.BackColor = FluentStyle.Background;
+        _title.ForeColor = FluentStyle.Text;
+        _subtitle.ForeColor = FluentStyle.Muted;
+        foreach (Control sidebarChild in _sidebar.Controls)
+            if (sidebarChild is Label label) label.ForeColor = FluentStyle.Text;
         _header.BackColor = FluentStyle.Background;
         _content.BackColor = FluentStyle.Background;
         foreach (var page in _pages.Values) page.BackColor = FluentStyle.Background;
@@ -551,8 +560,11 @@ internal sealed class DeviceHubForm : Form {
             foreach (Control card in flow.Controls) {
                 if (card is FluentCard) {
                     card.BackColor = FluentStyle.Background;
-                    foreach (Control child in card.Controls)
-                        if (child is Label) child.ForeColor = FluentStyle.Text;
+                    foreach (Control child in card.Controls) {
+                        if (child is Label label) label.ForeColor = FluentStyle.Text;
+                        if (child is TextBox box) { box.BackColor = FluentStyle.SurfaceHover; box.ForeColor = FluentStyle.Text; }
+                        if (child is NumericUpDown number) { number.BackColor = FluentStyle.SurfaceHover; number.ForeColor = FluentStyle.Text; }
+                    }
                 }
                 card.Invalidate(true);
             }
