@@ -124,4 +124,16 @@ Verify(ReleaseUpdates.IsNewer("v2.1.0", new Version(2, 0, 0)) &&
     "GitHub release comparison detects only upgrades");
 Verify(new BatteryHistory().Forecast("does-not-exist").Contains("Недостаточно"),
     "Battery lifetime estimation refuses insufficient data");
+Verify(AccentTheme.CycleSeconds == 9, "Default RGB cycle speed stays compatible with earlier versions");
+AccentTheme.SetCycleSeconds(5);
+Verify(AccentTheme.CycleSeconds == 5 &&
+    AccentTheme.Rainbow(0).ToArgb() == AccentTheme.Rainbow(5000).ToArgb(),
+    "RGB preview remains smooth and periodic after selecting a custom cycle speed");
+AccentTheme.SetCycleSeconds(9);
+AccentTheme.SetSystemAccent(true);
+Verify(AccentTheme.SystemAccentEnabled && !AccentTheme.RgbEnabled,
+    "Windows accent option does not overwrite stored RGB color");
+AccentTheme.Reset();
+Verify(!AccentTheme.SystemAccentEnabled && !AccentTheme.RgbEnabled,
+    "Reset restores previous default appearance");
 Console.WriteLine($"{assertions} checks passed.");
