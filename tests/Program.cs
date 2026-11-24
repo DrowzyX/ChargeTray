@@ -167,4 +167,12 @@ chargeTracker.Reset();
 Verify(!chargeTracker.LikelyCharging, "Disconnect resets power inference");
 chargeTracker.Observe(100, false, t0.AddMinutes(46));
 Verify(!chargeTracker.LikelyCharging, "Full battery is not proof of ongoing charging");
+var usbKeyboard = new Accessory("aula:f108-pro", "AULA F108 Pro", DeviceType.Keyboard,
+    "Донгл 2,4 ГГц", 98, Detail: "USB подключён · зарядка не подтверждена",
+    IsStale: true, UsbConnected: true);
+Verify(usbKeyboard.UsbConnected && !usbKeyboard.Charging && usbKeyboard.IsStale,
+    "USB cable presence must not incorrectly claim charging");
+var personalized = new SettingsStore().Apply([usbKeyboard]);
+Verify(personalized.Length == 1 && personalized[0].UsbConnected && !personalized[0].Charging,
+    "Custom device names preserve the independent USB status");
 Console.WriteLine($"{assertions} checks passed.");
