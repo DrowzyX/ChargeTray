@@ -21,8 +21,8 @@ jobs:
         run: dotnet publish src/ChargeTray.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
       - name: Package
         shell: pwsh
-        run: Compress-Archive -Path publish/* -DestinationPath ChargeTray-2.1.0-win-x64.zip
+        run: Compress-Archive -Path publish/* -DestinationPath ChargeTray-2.1.1-win-x64.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: ChargeTray-2.1.0-win-x64
-          path: ChargeTray-2.1.0-win-x64.zip
+          name: ChargeTray-2.1.1-win-x64
+          path: ChargeTray-2.1.1-win-x64.zip
