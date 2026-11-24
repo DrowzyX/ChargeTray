@@ -119,10 +119,13 @@ sealed class BatteryReader : IDisposable {
             _aulaWasConnected = true;
             _aulaPower.Observe(level, aula.Stale, DateTime.UtcNow);
             bool usbConnected = wired.Length > 0;
-            string powerStatus = _aulaPower.LikelyCharging
-                ? "⚡? Вероятно заряжается (по росту процента)"
-                : usbConnected ? "USB подключён · зарядка не подтверждена"
-                : "Статус зарядки неизвестен";
+            string powerStatus = usbConnected
+                ? _aulaPower.LikelyCharging
+                    ? "USB подключён · возможно заряжается (по росту процента)"
+                    : "USB подключён · зарядка не подтверждена"
+                : _aulaPower.LikelyCharging
+                    ? "⚡? Вероятно заряжается (по росту процента)"
+                    : "Статус зарядки неизвестен";
             HardwareDiagnostics = [..HardwareDiagnostics,
                 "AULA charging inference | " + powerStatus +
                 " | USB data=" + (usbConnected ? "yes" : "no") +
@@ -131,7 +134,7 @@ sealed class BatteryReader : IDisposable {
                 !aula.Receiver ? "USB-кабель" :
                 aula.Stale ? "Донгл 2,4 ГГц · последнее показание" :
                 level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет показаний", level,
-                Detail: powerStatus, IsStale: aula.Stale));
+                Detail: powerStatus, IsStale: aula.Stale, UsbConnected: usbConnected));
         }
         if (!aula.Receiver) { _aulaWasConnected = false; _aulaPower.Reset(); }
         if (WindowsBattery.Read() is { } batteryDevice) connected.Add(batteryDevice);

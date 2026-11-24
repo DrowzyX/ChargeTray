@@ -3,7 +3,7 @@ namespace ChargeTray;
 enum DeviceType { Keyboard, Mouse, Headphones, Controller, Other, SystemBattery }
 enum Band { Empty, Low, Medium, Full }
 sealed record Accessory(string Key, string Name, DeviceType Type, string Via,
-    int? Percent = null, Band? Level = null, bool Charging = false, string? Model = null, string? Detail = null, bool IsStale = false) {
+    int? Percent = null, Band? Level = null, bool Charging = false, string? Model = null, string? Detail = null, bool IsStale = false, bool UsbConnected = false) {
     public bool HasCurrentReading => !IsStale && (Percent.HasValue || Level.HasValue);
     public bool Low => !IsStale && !Charging && (Percent is <15 || Percent is null && Level is Band.Empty or Band.Low);
     public string Reading => Percent is int p ? IsStale ? $"≈{p}%" : $"{p}%" : Level switch {
