@@ -13,7 +13,9 @@ internal sealed class AppPreferences {
     public bool BatteryHistory { get; set; } = true;
     public bool CheckUpdates { get; set; } = true;
     public bool EconomyMode { get; set; }
+    public string ThemeMode { get; set; } = "dark";
     public int IslandMonitor { get; set; } = 0;
+    public int IslandTopOffset { get; set; } = 9;
     public Dictionary<string, DevicePreferences> Devices { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 internal sealed class SettingsStore {
@@ -30,6 +32,7 @@ internal sealed class SettingsStore {
                 Values.Devices ?? new(), StringComparer.OrdinalIgnoreCase);
             foreach (var p in Values.Devices.Values) p.AlertThreshold = Math.Clamp(p.AlertThreshold, 1, 99);
             Values.IslandMonitor = Math.Max(0, Values.IslandMonitor);
+            Values.IslandTopOffset = Math.Clamp(Values.IslandTopOffset, 0, 120);
         } catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) {
             Values = new(); // Corrupted preferences must never block startup.
         }

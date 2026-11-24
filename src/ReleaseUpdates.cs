@@ -1,12 +1,13 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace ChargeTray;
 
 // Only retrieves GitHub's public release metadata. Never silently replaces an EXE.
 internal static class ReleaseUpdates {
-    internal sealed record Release(string Tag, string Url, string? AssetUrl, string? AssetName);
+    internal sealed record Release(string Tag, string Url, string? AssetUrl, string? AssetName, string? Digest);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(22) };
     private const string Api = "https://api.github.com/repos/DrowzyX/ChargeTray/releases/latest";
 
@@ -21,7 +22,7 @@ internal static class ReleaseUpdates {
         var root = json.RootElement;
         var tag = root.GetProperty("tag_name").GetString() ?? "";
         var url = root.GetProperty("html_url").GetString() ?? "";
-        string? assetUrl = null, name = null;
+        string? assetUrl = null, name = null, digest = null;
         if (root.TryGetProperty("assets", out var assets))
             foreach (var asset in assets.EnumerateArray()) {
                 string filename = asset.GetProperty("name").GetString() ?? "";
@@ -29,11 +30,12 @@ internal static class ReleaseUpdates {
                     !filename.Contains("win-x64", StringComparison.OrdinalIgnoreCase)) continue;
                 name = filename;
                 assetUrl = asset.GetProperty("browser_download_url").GetString();
+                digest = asset.TryGetProperty("digest", out var hash) ? hash.GetString() : null;
                 break;
             }
         if (!Uri.TryCreate(url, UriKind.Absolute, out var page) || page.Host != "github.com")
             return null;
-        return new(tag, url, assetUrl, name);
+        return new(tag, url, assetUrl, name, digest);
     }
 
     internal static bool IsNewer(string? tag, Version current) {
@@ -67,6 +69,12 @@ internal static class ReleaseUpdates {
                     if (count > 350_000_000) throw new IOException("Архив обновления слишком большой");
                     await to.WriteAsync(buffer.AsMemory(0, read), cancellation);
                 }
+            }
+            if (release.Digest is { } expected && expected.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) {
+                using var verify = File.OpenRead(temp);
+                string actual = Convert.ToHexString(SHA256.HashData(verify));
+                if (!actual.Equals(expected[7..], StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("SHA256 скачанного архива не совпадает с GitHub Release");
             }
             File.Move(temp, dest, overwrite: true);
             return dest;

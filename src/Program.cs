@@ -9,6 +9,11 @@ namespace ChargeTray;
 static class Program {
     [STAThread]
     private static void Main(string[] args) {
+        if (args.Length >= 3 && args[0] == "--apply-update") {
+            if (int.TryParse(args[1], out int parentId))
+                SafeUpdateInstaller.Apply(parentId, args[2]);
+            return;
+        }
         bool demo = args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool autoStarted = args.Contains("--startup", StringComparer.OrdinalIgnoreCase);
         using var single = new Mutex(true, demo ? @"Local\ChargeTray.Demo.v1" : @"Local\ChargeTray.Live.v1", out bool first);
@@ -38,7 +43,7 @@ sealed class TrayApp : ApplicationContext {
     private readonly ToolStripMenuItem _extra = new("Отдельный значок для каждого устройства");
     private readonly ToolStripMenuItem _colors = new("Оформление и RGB");
     private readonly ToolStripMenuItem _rgbItem = new("Плавная RGB-анимация");
-    private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 50 };
+    private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 16 };
     private readonly Dictionary<string, (NotifyIcon Tray, Icon Icon, string Signature)> _icons = new();
     private readonly HashSet<string> _customAlerted = new(StringComparer.OrdinalIgnoreCase);
     private readonly SettingsStore _prefs = new();
@@ -66,9 +71,11 @@ sealed class TrayApp : ApplicationContext {
 
     public TrayApp(bool demo) {
         AccentTheme.Load();
+        FluentStyle.SetTheme(_prefs.Values.ThemeMode);
         _demo = demo;
         _panel = new BatteryPanel();
         _island.MonitorIndex = _prefs.Values.IslandMonitor;
+        _island.TopOffset = _prefs.Values.IslandTopOffset;
         _updateTimer.Tick += async (_, _) => await CheckUpdatesQuietly();
         _panel.RefreshRequested += async () => await Refresh(true);
         _strip.OpenPanel += () => Open(44);
@@ -111,6 +118,7 @@ sealed class TrayApp : ApplicationContext {
             if (_panel.Visible) _panel.Invalidate();
             if (_island.Visible) _island.Invalidate();
             if (_strip.Visible) _strip.Invalidate();
+            if (_hub?.Visible == true) _hub.ThemeFrame();
         };
         _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
         if (!demo) {
@@ -226,8 +234,15 @@ sealed class TrayApp : ApplicationContext {
             if (_poll.Interval != interval) _poll.Interval = interval;
             _rawData = next;
             var oldKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var oldReadings = _data.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
             _data = _prefs.Apply(next);
             if (_seenFirstScan && _prefs.Values.ConnectionNotifications) {
+                var charging = _data.Where(d => d.Charging &&
+                    (!oldReadings.TryGetValue(d.Key, out var prior) || !prior.Charging)).Take(2).ToArray();
+                if (charging.Length > 0)
+                    _main.ShowBalloonTip(3500, "ChargeTray · зарядка",
+                        string.Join("\n", charging.Select(d => "⚡ Заряжается: " + Trim(d.Name, 35))),
+                        ToolTipIcon.Info);
                 var newKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var added = _data.Where(d => !oldKeys.Contains(d.Key)).Take(3).ToArray();
                 var removed = oldKeys.Where(k => !newKeys.Contains(k)).Take(3).ToArray();
@@ -276,13 +291,19 @@ sealed class TrayApp : ApplicationContext {
     private void OpenHub() {
         if (_hub is null || _hub.IsDisposed) {
             _hub = new DeviceHubForm(_prefs, _history);
+            _hub.CopySummaryRequested += CopyDiagnostics;
+            _hub.CopyDeveloperRequested += async () => await CopyDeveloperDiagnostics();
+            _hub.CloseForUpdateRequested += () => ExitThread();
             _hub.RefreshRequested += async () => await Refresh(true);
             _hub.MonitorChanged += index => {
                 _island.MonitorIndex = index;
+                _island.TopOffset = _prefs.Values.IslandTopOffset;
                 RenderTray();
             };
             _hub.PreferencesChanged += () => {
                 _data = _prefs.Apply(_rawData);
+                _island.TopOffset = _prefs.Values.IslandTopOffset;
+                _island.UpdateIsland(_positionMode == "top", _data);
                 _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
                 _updateTimer.Enabled = _prefs.Values.CheckUpdates && !_demo;
                 RenderTray();

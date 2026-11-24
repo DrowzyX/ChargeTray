@@ -20,6 +20,7 @@ sealed class ChargeIsland : Form {
     private bool _enabled, _inside, _low;
     private DateTime _pulseUntil;
     internal int MonitorIndex;
+    internal int TopOffset = 9;
     private float _progress, _from, _target, _scale = 1, _openWidth = 180;
     internal event Action<Point>? OpenPanel;
 
@@ -89,7 +90,7 @@ sealed class ChargeIsland : Form {
         float fit = Math.Min(_openWidth, Math.Max(RestW, area.Width / _scale - 20));
         int w = (int)Math.Ceiling((RestW + (fit - RestW) * _progress) * _scale);
         int h = (int)Math.Ceiling((RestH + (OpenH - RestH) * _progress) * _scale);
-        var next = new Rectangle(area.Left + (area.Width - w) / 2, area.Top + (int)(9 * _scale), w, h);
+        var next = new Rectangle(area.Left + (area.Width - w) / 2, area.Top + (int)(TopOffset * _scale), w, h);
         if (next != Bounds || Region is null) {
             Bounds = next;
             using var outline = Shapes.Round(new RectangleF(0, 0, w, h), h / 2f - .4f);
