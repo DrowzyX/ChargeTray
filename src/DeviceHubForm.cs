@@ -350,7 +350,17 @@ internal sealed class DeviceHubForm : Form {
             Left = 319, Top = 129, Width = 170 };
         speed.Click += (_, _) => {
             var menu = new ContextMenuStrip();
-            menu.Closed += (_, _) => menu.Dispose();
+            menu.Closed += (_, _) => {
+                // WinForms continues processing OnItemClicked after Closed.
+                // Dispose on the next UI message, never inside the close event.
+                if (IsHandleCreated && !IsDisposed && !Disposing) {
+                    try {
+                        BeginInvoke((Action)(() => menu.Dispose()));
+                    } catch (InvalidOperationException) { menu.Dispose(); }
+                } else {
+                    menu.Dispose();
+                }
+            };
             foreach (int duration in new[] { 18, 9, 5 }) {
                 int selected = duration;
                 menu.Items.Add(duration + " секунд", null, (_, _) => {
@@ -377,7 +387,17 @@ internal sealed class DeviceHubForm : Form {
         var theme = new FluentButton(themeText) { Left = 20, Top = 86, Width = 276 };
         theme.Click += (_, _) => {
             var menu = new ContextMenuStrip();
-            menu.Closed += (_, _) => menu.Dispose();
+            menu.Closed += (_, _) => {
+                // WinForms continues processing OnItemClicked after Closed.
+                // Dispose on the next UI message, never inside the close event.
+                if (IsHandleCreated && !IsDisposed && !Disposing) {
+                    try {
+                        BeginInvoke((Action)(() => menu.Dispose()));
+                    } catch (InvalidOperationException) { menu.Dispose(); }
+                } else {
+                    menu.Dispose();
+                }
+            };
             menu.Items.Add("Тёмная — системный графит", null, (_, _) => ThemeChoice("dark", theme));
             menu.Items.Add("Светлая — Windows 11", null, (_, _) => ThemeChoice("light", theme));
             menu.Items.Add("Автоматически по Windows", null, (_, _) => ThemeChoice("system", theme));
@@ -422,7 +442,17 @@ internal sealed class DeviceHubForm : Form {
             Width = 338, Height = 40 };
         chooser.Click += (_, _) => {
             var menu = new ContextMenuStrip();
-            menu.Closed += (_, _) => menu.Dispose();
+            menu.Closed += (_, _) => {
+                // WinForms continues processing OnItemClicked after Closed.
+                // Dispose on the next UI message, never inside the close event.
+                if (IsHandleCreated && !IsDisposed && !Disposing) {
+                    try {
+                        BeginInvoke((Action)(() => menu.Dispose()));
+                    } catch (InvalidOperationException) { menu.Dispose(); }
+                } else {
+                    menu.Dispose();
+                }
+            };
             for (int i = 0; i < Screen.AllScreens.Length; i++) {
                 int index = i;
                 menu.Items.Add(ScreenLabel(index), null, (_, _) => {
