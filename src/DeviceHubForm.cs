@@ -214,7 +214,7 @@ internal sealed class DeviceHubForm : Form {
         percent.TextAlign = ContentAlignment.TopRight;
         card.Controls.Add(percent);
         var bar = new BatteryProgress { Percent = d.IsStale ? null : d.Percent, Low = d.Low,
-            SetBounds = new Rectangle(22, 82, 590, 8) };
+            Bounds = new Rectangle(22, 82, 590, 8) };
         card.Controls.Add(bar);
         var pref = _settings.Device(d.Key);
         card.Controls.Add(Label("Название", 22, 111, 72, 24, 9, muted: true));
@@ -338,7 +338,8 @@ internal sealed class DeviceHubForm : Form {
         var speed = new FluentButton(AccentTheme.CycleSeconds + " сек / цикл") {
             Left = 319, Top = 129, Width = 170 };
         speed.Click += (_, _) => {
-            using var menu = new ContextMenuStrip();
+            var menu = new ContextMenuStrip();
+            menu.Closed += (_, _) => menu.Dispose();
             foreach (int duration in new[] { 18, 9, 5 }) {
                 int selected = duration;
                 menu.Items.Add(duration + " секунд", null, (_, _) => {
@@ -351,7 +352,7 @@ internal sealed class DeviceHubForm : Form {
         };
         animation.Controls.Add(speed);
         var preview = new BatteryProgress { Percent = 75, Low = false,
-            SetBounds = new Rectangle(23, 188, 560, 10) };
+            Bounds = new Rectangle(23, 188, 560, 10) };
         animation.Controls.Add(preview);
         animation.Resize += (_, _) => preview.Width = animation.Width - 48;
         _styleList.Controls.Add(animation);
@@ -359,7 +360,8 @@ internal sealed class DeviceHubForm : Form {
         var other = Group("Режим оформления", "Оформление сохраняется при следующем запуске.", 160);
         var theme = new FluentButton("Тёмная тема Windows 11") { Left = 20, Top = 86, Width = 276 };
         theme.Click += (_, _) => {
-            using var menu = new ContextMenuStrip();
+            var menu = new ContextMenuStrip();
+            menu.Closed += (_, _) => menu.Dispose();
             menu.Items.Add("Тёмная — системный графит", null, (_, _) => ThemeChoice("dark", theme));
             menu.Items.Add("Светлая — Windows 11", null, (_, _) => ThemeChoice("light", theme));
             menu.Items.Add("Автоматически по Windows", null, (_, _) => ThemeChoice("system", theme));
@@ -403,7 +405,8 @@ internal sealed class DeviceHubForm : Form {
         var chooser = new FluentButton(ScreenLabel(selected)) { Left = 22, Top = 92,
             Width = 338, Height = 40 };
         chooser.Click += (_, _) => {
-            using var menu = new ContextMenuStrip();
+            var menu = new ContextMenuStrip();
+            menu.Closed += (_, _) => menu.Dispose();
             for (int i = 0; i < Screen.AllScreens.Length; i++) {
                 int index = i;
                 menu.Items.Add(ScreenLabel(index), null, (_, _) => {
@@ -553,11 +556,8 @@ internal sealed class DeviceHubForm : Form {
 }
 
 internal sealed class BatteryProgress : Control {
-    internal int? Percent { get; set; }
-    internal bool Low { get; set; }
-    internal Rectangle SetBounds {
-        set => Bounds = value;
-    }
+    internal int? Percent;
+    internal bool Low;
     internal BatteryProgress() {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
             ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
