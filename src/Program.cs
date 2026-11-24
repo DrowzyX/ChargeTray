@@ -66,6 +66,7 @@ sealed class TrayApp : ApplicationContext {
 
     public TrayApp(bool demo) {
         AccentTheme.Load();
+        FluentStyle.SetTheme(_prefs.Values.ThemeMode);
         _demo = demo;
         _panel = new BatteryPanel();
         _island.MonitorIndex = _prefs.Values.IslandMonitor;
@@ -111,6 +112,7 @@ sealed class TrayApp : ApplicationContext {
             if (_panel.Visible) _panel.Invalidate();
             if (_island.Visible) _island.Invalidate();
             if (_strip.Visible) _strip.Invalidate();
+            if (_hub?.Visible == true) _hub.ThemeFrame();
         };
         _themeTimer.Enabled = AccentTheme.RgbEnabled && !_prefs.Values.EconomyMode;
         if (!demo) {
@@ -276,6 +278,8 @@ sealed class TrayApp : ApplicationContext {
     private void OpenHub() {
         if (_hub is null || _hub.IsDisposed) {
             _hub = new DeviceHubForm(_prefs, _history);
+            _hub.CopySummaryRequested += CopyDiagnostics;
+            _hub.CopyDeveloperRequested += async () => await CopyDeveloperDiagnostics();
             _hub.RefreshRequested += async () => await Refresh(true);
             _hub.MonitorChanged += index => {
                 _island.MonitorIndex = index;
