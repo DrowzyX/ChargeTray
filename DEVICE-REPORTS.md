@@ -1,4 +1,4 @@
-# Новые устройства — предварительная поддержка ChargeTray 1.3 (исходники)
+# Новые устройства — предварительная поддержка ChargeTray 1.4
 
 | Устройство / интерфейс | ID | Что добавлено | Процент |
 |---|---|---|---|
@@ -14,9 +14,9 @@
 
 1. Закрой фирменное ПО мыши, если оно удерживает HID-интерфейс.
 2. Запусти ChargeTray из собранного проекта.
-3. Выбери «Скопировать диагностику» и отправь строки `Xenta 2.4 ГГц` и `Windows: клавиатуры, мыши...`.
+3. Выбери **Диагностика и поддержка → Скопировать отчёт для разработчика** и отправь разделы `USB / HID`, `HID коллекции` и `Протоколы батареи`.
 4. Для ARDOR Fury нужен полный `VID:PID` именно этого донгла. Надпись `PI: DS2403` на корпусе не является USB VID:PID.
 
-Сборка проекта: `dotnet publish src/ChargeTray.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true`. Требуется Windows и .NET 10 SDK.
+Сборка проекта: `dotnet publish src/ChargeTray.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`. Для сборки нужен .NET 10 SDK; автономный EXE не требует установленного .NET у пользователя.
 
-Для сборки на GitHub: скопируйте **содержимое** `Source` в корень репозитория, откройте вкладку **Actions → Build ChargeTray (Windows) → Run workflow**, скачайте ZIP из Artifacts завершённой сборки.
+Для сборки на GitHub: откройте **Actions → Build ChargeTray (Windows) → Run workflow** либо используйте сборку Pull Request. Скачайте ZIP из Artifacts успешно завершённой сборки.
