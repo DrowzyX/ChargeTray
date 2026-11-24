@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace ChargeTray;
 
@@ -53,6 +54,20 @@ internal sealed class DeviceHubForm : Form {
         _tabs.Font = new Font("Segoe UI", 10, FontStyle.Regular);
         _tabs.Padding = new Point(17, 8);
         _tabs.Appearance = TabAppearance.Normal;
+        _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
+        _tabs.SizeMode = TabSizeMode.Fixed;
+        _tabs.ItemSize = new Size(158, 33);
+        _tabs.DrawItem += (_, e) => {
+            bool selected = e.Index == _tabs.SelectedIndex;
+            var r = _tabs.GetTabRect(e.Index);
+            using var back = new SolidBrush(selected ? Color.FromArgb(47, 55, 72) : BackgroundInk);
+            e.Graphics.FillRectangle(back, r);
+            TextRenderer.DrawText(e.Graphics, _tabs.TabPages[e.Index].Text,
+                _tabs.Font, r, selected ? TextInk : HintInk,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            if (selected) using (var marker = new SolidBrush(AccentTheme.Accent))
+                e.Graphics.FillRectangle(marker, r.X + 24, r.Bottom - 3, r.Width - 48, 3);
+        };
         Controls.Add(_tabs);
         _tabs.BringToFront();
 
@@ -76,6 +91,18 @@ internal sealed class DeviceHubForm : Form {
         _historyCards.Resize += (_, _) => ResizeCards(_historyCards);
         BuildSettings(settingsPage);
         FormClosed += (_, _) => { /* Form can be reopened; parent owns disposal. */ };
+    }
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+    protected override void OnHandleCreated(EventArgs e) {
+        base.OnHandleCreated(e);
+        try {
+            int yes = 1;
+            DwmSetWindowAttribute(Handle, 20, ref yes, sizeof(int)); // dark title bar
+            int round = 2;
+            DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int)); // rounded corners on Windows 11
+        } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
     }
 
     internal void ShowHub() {
@@ -272,6 +299,26 @@ internal sealed class DeviceHubForm : Form {
         var note = TextLabel("RGB-цвета и плавная смена оттенков сохранены из 1.4.\nВыбор цвета: правый клик по значку → Оформление и RGB.", 10);
         note.Size = new Size(630, 58); note.Margin = new Padding(4, 20, 0, 4);
         panel.Controls.Add(note);
+        var colorButton = ActionButton("Выбрать RGB-цвет интерфейса", 325);
+        colorButton.Margin = new Padding(4, 10, 0, 5);
+        colorButton.Click += (_, _) => {
+            using var dialog = new ColorDialog { Color = AccentTheme.Fixed, AnyColor = true, FullOpen = true };
+            if (dialog.ShowDialog(this) == DialogResult.OK) {
+                AccentTheme.SetColor(dialog.Color);
+                PreferencesChanged?.Invoke();
+                RefreshLists();
+            }
+        };
+        panel.Controls.Add(colorButton);
+        var rgb = new CheckBox { Text = "Плавная RGB-анимация (как в 1.4)",
+            AutoSize = true, Checked = AccentTheme.RgbEnabled, ForeColor = TextInk,
+            Font = new Font("Segoe UI", 11), Margin = new Padding(4, 10, 0, 7) };
+        rgb.CheckedChanged += (_, _) => {
+            AccentTheme.SetRgb(rgb.Checked);
+            PreferencesChanged?.Invoke();
+            RefreshLists();
+        };
+        panel.Controls.Add(rgb);
         var update = ActionButton("Проверить обновления и скачать ZIP", 325);
         update.Margin = new Padding(4, 16, 0, 5);
         update.Click += async (_, _) => {
