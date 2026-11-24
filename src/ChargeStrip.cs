@@ -116,7 +116,7 @@ sealed class ChargeStrip : Form {
         var bg = _light ? Color.FromArgb(250, 247, 243) : Color.FromArgb(28, 26, 29);
         g.Clear(bg);
         using var frame = Shapes.Round(new RectangleF(.5f, .5f, _logicalWidth - 1, 33), 10);
-        using var hairline = new Pen(_light ? Color.FromArgb(202, 190, 177) : Color.FromArgb(81, 69, 65));
+        using var hairline = new Pen(Color.FromArgb(_light ? 145 : 100, AccentTheme.Accent));
         g.DrawPath(hairline, frame);
         using var nameFont = new Font("Segoe UI", 12, FontStyle.Regular, GraphicsUnit.Pixel);
         using var numberFont = new Font("Segoe UI", 15, FontStyle.Bold, GraphicsUnit.Pixel);
@@ -132,7 +132,7 @@ sealed class ChargeStrip : Form {
             if (i > 0) g.DrawLine(hairline, x - 5, 10, x - 5, 24);
             Shapes.Glyph(g, s.Device.Type, new RectangleF(x, 8, 18, 18), fg, 1.9f);
             g.DrawString(s.Caption, nameFont, mutedBrush, new RectangleF(x + 22, 0, s.Width - 25 - s.ValueWidth, 34), fmt);
-            var tint = !s.Device.Low ? fg : _light ? Color.FromArgb(166, 30, 47) : Color.FromArgb(255, 167, 171);
+            var tint = !s.Device.Low ? AccentTheme.Accent : _light ? Color.FromArgb(166, 30, 47) : Color.FromArgb(255, 167, 171);
             using var valueBrush = new SolidBrush(tint);
             g.DrawString(Value(s.Device), numberFont, valueBrush, new RectangleF(x + s.Width - s.ValueWidth - 2, 0, s.ValueWidth + 4, 34), fmt);
             x += s.Width + 8;
