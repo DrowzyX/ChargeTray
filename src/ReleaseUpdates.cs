@@ -71,7 +71,8 @@ internal static class ReleaseUpdates {
                 }
             }
             if (release.Digest is { } expected && expected.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) {
-                string actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(temp)));
+                using var verify = File.OpenRead(temp);
+                string actual = Convert.ToHexString(SHA256.HashData(verify));
                 if (!actual.Equals(expected[7..], StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("SHA256 скачанного архива не совпадает с GitHub Release");
             }
