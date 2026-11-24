@@ -34,6 +34,7 @@ internal sealed class DeviceHubForm : Form {
     internal event Action<int>? MonitorChanged;
     internal event Action? CopySummaryRequested;
     internal event Action? CopyDeveloperRequested;
+    internal event Action? CloseForUpdateRequested;
 
     internal DeviceHubForm(SettingsStore settings, BatteryHistory history) {
         _settings = settings;
@@ -485,9 +486,19 @@ internal sealed class DeviceHubForm : Form {
             var path = await ReleaseUpdates.Download(release);
             if (path is null) Process.Start(new ProcessStartInfo(release.Url) { UseShellExecute = true });
             else {
-                ReleaseUpdates.OpenFolder(path);
-                MessageBox.Show(this, "Архив загружен. Закройте ChargeTray, распакуйте ZIP и запустите EXE.",
-                    "ChargeTray");
+                if (release.Digest is { } digest && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) &&
+                    MessageBox.Show(this, "ZIP загружен и проверен по SHA256 GitHub.\n\n" +
+                        "Установить обновление автоматически с резервной копией предыдущей версии? " +
+                        "ChargeTray закроется и перезапустится. Если установлен в защищённую папку, " +
+                        "может понадобиться ручная установка.",
+                        "ChargeTray — установка", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) {
+                    SafeUpdateInstaller.PrepareAndLaunch(path, Application.ExecutablePath);
+                    CloseForUpdateRequested?.Invoke();
+                } else {
+                    ReleaseUpdates.OpenFolder(path);
+                    MessageBox.Show(this, "Архив сохранён. Для установки закройте ChargeTray, " +
+                        "распакуйте ZIP и запустите EXE.", "ChargeTray");
+                }
             }
         } catch (Exception e) {
             MessageBox.Show(this, "Обновление не удалось: " + e.GetType().Name, "ChargeTray");
