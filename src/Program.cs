@@ -9,6 +9,11 @@ namespace ChargeTray;
 static class Program {
     [STAThread]
     private static void Main(string[] args) {
+        if (args.Length >= 3 && args[0] == "--apply-update") {
+            if (int.TryParse(args[1], out int parentId))
+                SafeUpdateInstaller.Apply(parentId, args[2]);
+            return;
+        }
         bool demo = args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool autoStarted = args.Contains("--startup", StringComparer.OrdinalIgnoreCase);
         using var single = new Mutex(true, demo ? @"Local\ChargeTray.Demo.v1" : @"Local\ChargeTray.Live.v1", out bool first);
@@ -288,6 +293,7 @@ sealed class TrayApp : ApplicationContext {
             _hub = new DeviceHubForm(_prefs, _history);
             _hub.CopySummaryRequested += CopyDiagnostics;
             _hub.CopyDeveloperRequested += async () => await CopyDeveloperDiagnostics();
+            _hub.CloseForUpdateRequested += () => ExitThread();
             _hub.RefreshRequested += async () => await Refresh(true);
             _hub.MonitorChanged += index => {
                 _island.MonitorIndex = index;
