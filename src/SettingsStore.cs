@@ -13,6 +13,7 @@ internal sealed class AppPreferences {
     public bool BatteryHistory { get; set; } = true;
     public bool CheckUpdates { get; set; } = true;
     public bool EconomyMode { get; set; }
+    public string ThemeMode { get; set; } = "dark";
     public int IslandMonitor { get; set; } = 0;
     public Dictionary<string, DevicePreferences> Devices { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
