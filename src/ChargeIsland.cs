@@ -19,7 +19,7 @@ sealed class ChargeIsland : Form {
     private int _deviceCount;
     private bool _enabled, _inside, _low;
     private DateTime _pulseUntil;
-    internal int MonitorIndex { get; set; }
+    internal int MonitorIndex;
     private float _progress, _from, _target, _scale = 1, _openWidth = 180;
     internal event Action<Point>? OpenPanel;
 
