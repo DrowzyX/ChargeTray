@@ -99,4 +99,10 @@ Verify(XentaBatteryPacket.Percent([0x03, 0x55, 0x40, 0x01, 0x00]) is null, "Xent
 Verify(XentaBatteryPacket.Percent([0x03, 0x55, 0x40, 0x01, 101]) is null, "Xenta value above 100 is rejected");
 Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(30)) is null, "Separated Xenta frames need fresh confirmation");
 Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(32)) == 62, "Valid report after timeout restores the battery level");
+Verify(AccentTheme.TryParse("#3479EF", out var customColor) && customColor.R == 0x34 &&
+    customColor.G == 0x79 && customColor.B == 0xEF, "Any 6-digit RGB hex color parses correctly");
+Verify(!AccentTheme.TryParse("#GGCC11", out _) && !AccentTheme.TryParse("123", out _),
+    "Invalid accent color settings are rejected");
+Verify(AccentTheme.Rainbow(0).ToArgb() == AccentTheme.Rainbow(9000).ToArgb(),
+    "Animated RGB loop repeats after nine seconds");
 Console.WriteLine($"{assertions} checks passed.");
