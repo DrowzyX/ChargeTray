@@ -8,6 +8,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ChargeTray</AssemblyName>
     <ApplicationIcon>icon.ico</ApplicationIcon>
-    <Version>1.4.0</Version>
+    <Version>2.0.0</Version>
   </PropertyGroup>
 </Project>
