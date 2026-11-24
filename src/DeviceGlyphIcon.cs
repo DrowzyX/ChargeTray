@@ -21,6 +21,6 @@ internal sealed class DeviceGlyphIcon : Control {
             FluentStyle.SurfaceHover, 11, false);
         float side = Math.Min(25f, Math.Min(Width, Height) * .65f);
         var rect = new RectangleF((Width - side) / 2f, (Height - side) / 2f, side, side);
-        BatteryPanel.Glyph(g, _type, rect, FluentStyle.Text, 1.8f);
+        Shapes.Glyph(g, _type, rect, FluentStyle.Text, 1.8f);
     }
 }
