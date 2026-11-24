@@ -67,6 +67,7 @@ internal static class AccentTheme {
     internal static void Reset() {
         _color = Color.FromArgb(226, 197, 160);
         _rgb = false;
+        _systemAccent = false;
         Save();
     }
 
