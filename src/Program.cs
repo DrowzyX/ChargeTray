@@ -258,7 +258,8 @@ sealed class TrayApp : ApplicationContext {
     private static string Signature(Accessory? d, bool light, int size) => $"{d?.Type}:{Label(d)}:{d?.Low}:{light}:{size}";
 
     private void CopyDiagnostics() {
-        var text = new StringBuilder("ChargeTray 1.2.0").AppendLine()
+        var version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+        var text = new StringBuilder($"ChargeTray {version}").AppendLine()
             .AppendLine(Environment.OSVersion.VersionString)
             .AppendLine($"Последний опрос: {_updated?.ToString("HH:mm:ss") ?? "—"}");
         foreach (var d in _data) text.AppendLine($"{d.Name} | {d.Model ?? "—"} | {d.Type} | {d.Via} | {d.Reading}");
@@ -283,6 +284,7 @@ sealed class TrayApp : ApplicationContext {
         _exiting = true;
         Application.Idle -= FirstIdle;
         _poll.Dispose();
+        _reader.Dispose();
         foreach (var i in _icons.Values) { i.Tray.Dispose(); i.Icon.Dispose(); }
         _main.Dispose(); _mainIcon?.Dispose();
         _island.Dispose(); _menu.Dispose(); _strip.Dispose(); _panel.Dispose();
