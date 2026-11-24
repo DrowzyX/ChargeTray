@@ -40,7 +40,6 @@ sealed class TrayApp : ApplicationContext {
     private readonly ToolStripMenuItem _rgbItem = new("Плавная RGB-анимация");
     private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 50 };
     private readonly Dictionary<string, (NotifyIcon Tray, Icon Icon, string Signature)> _icons = new();
-    private readonly LowBatteryAlerts _alerts = new();
     private readonly HashSet<string> _customAlerted = new(StringComparer.OrdinalIgnoreCase);
     private readonly SettingsStore _prefs = new();
     private readonly BatteryHistory _history = new();
