@@ -19,6 +19,11 @@ internal sealed class DeviceHubForm : Form {
     private readonly FlowLayoutPanel _styleList = NewFlow();
     private readonly FlowLayoutPanel _settingsList = NewFlow();
     private readonly FlowLayoutPanel _diagnosticsList = NewFlow();
+    private readonly FlowLayoutPanel _labList = NewFlow();
+    private readonly List<FluentColorChip> _colorChips = [];
+    private readonly List<ProtocolSnapshot> _labSnapshots = [];
+    private string[] _hardwareInfo = [];
+    private TextBox? _labOutput;
     private readonly Label _title = UiElements.Label("Устройства", 23, true);
     private readonly Label _subtitle = UiElements.Label("Мониторинг подключённой периферии", 10, muted: true);
     private readonly Label _deviceStatus = UiElements.Label("", 9, muted: true);
@@ -75,6 +80,7 @@ internal sealed class DeviceHubForm : Form {
         AddNavigation("appearance", "Оформление", "◈", 210);
         AddNavigation("settings", "Настройки", "⚙", 259);
         AddNavigation("diagnostics", "Диагностика", "≡", 308);
+        AddNavigation("lab", "Protocol Lab", "⚗", 357);
         var sidebarFooter = UiElements.Label("Локально · без аккаунта", 8, muted: true);
         sidebarFooter.Dock = DockStyle.Bottom;
         sidebarFooter.Height = 43;
@@ -105,9 +111,11 @@ internal sealed class DeviceHubForm : Form {
         Page("appearance", _styleList);
         Page("settings", _settingsList);
         Page("diagnostics", _diagnosticsList);
+        Page("lab", _labList);
         BuildAppearance();
         BuildSettings();
         BuildDiagnostics();
+        BuildProtocolLab();
         SelectPage("devices");
 
         _resizeDelay.Tick += (_, _) => { _resizeDelay.Stop(); SizeCards(); };
@@ -146,14 +154,15 @@ internal sealed class DeviceHubForm : Form {
         _title.Text = key switch {
             "devices" => "Мои устройства", "history" => "История батареи",
             "appearance" => "Оформление", "settings" => "Настройки",
-            _ => "Диагностика"
+            "diagnostics" => "Диагностика", _ => "Protocol Lab"
         };
         _subtitle.Text = key switch {
             "devices" => "Все подключённые устройства и их заряд",
             "history" => "Локальные измерения за последние 30 дней",
             "appearance" => "Windows 11 Fluent · сохранили прежнюю RGB-подсветку",
             "settings" => "Уведомления, монитор, обновления",
-            _ => "Отчёты устройств и поддержка новых моделей"
+            "diagnostics" => "Отчёты устройств и поддержка новых моделей",
+            _ => "Сравнение состояний без отправки неизвестных HID-команд"
         };
         if (key is "devices" or "history") RefreshLists();
         SizeCards();
@@ -174,7 +183,8 @@ internal sealed class DeviceHubForm : Form {
         Activate();
         RefreshLists();
     }
-    internal void UpdateDevices(Accessory[] devices, DateTime? updated) {
+    internal void UpdateDevices(Accessory[] devices, DateTime? updated, string[]? hardware = null) {
+        if (hardware is not null) _hardwareInfo = hardware;
         _devices = devices;
         _updated = updated;
         if (Visible && !IsDisposed && _selected is "devices" or "history") RefreshLists();
@@ -292,6 +302,7 @@ internal sealed class DeviceHubForm : Form {
         SizeCards(_styleList);
         SizeCards(_settingsList);
         SizeCards(_diagnosticsList);
+        SizeCards(_labList);
     }
     private static void SizeCards(FlowLayoutPanel flow) {
         int width = Math.Max(450, flow.ClientSize.Width - 48);
@@ -347,9 +358,20 @@ internal sealed class DeviceHubForm : Form {
             FlowDirection = FlowDirection.LeftToRight, WrapContents = true,
             BackColor = FluentStyle.Surface };
         foreach (var swatch in presets) {
-            var b = new FluentButton("● " + swatch.Name) { Size = new Size(93, 34), Font = FluentStyle.Font(8) };
+            var b = new FluentColorChip(swatch.Name, swatch.Value) {
+                Selected = !AccentTheme.RgbEnabled && !AccentTheme.SystemAccentEnabled &&
+                    AccentTheme.Fixed.ToArgb() == swatch.Value.ToArgb()
+            };
             var color = swatch.Value;
-            b.Click += (_, _) => { AccentTheme.SetColor(color); UpdateThemeImmediately(); };
+            b.Click += (_, _) => {
+                AccentTheme.SetColor(color);
+                foreach (var chip in _colorChips) {
+                    chip.Selected = chip.BaseColor.ToArgb() == color.ToArgb();
+                    chip.Invalidate();
+                }
+                UpdateThemeImmediately();
+            };
+            _colorChips.Add(b);
             palette.Controls.Add(b);
         }
         accent.Controls.Add(palette);
@@ -447,6 +469,14 @@ internal sealed class DeviceHubForm : Form {
         Toggle(notify, "Низкий заряд по индивидуальным порогам", 129, _settings.Values.BatteryNotifications,
             v => _settings.Values.BatteryNotifications = v);
         _settingsList.Controls.Add(notify);
+
+        var vendor = Group("Vendor Bridge · Device Intelligence",
+            "Опциональный локальный JSON от проверенной утилиты производителя.", 195);
+        Toggle(vendor, "Разрешить локальный Vendor Bridge", 82, _settings.Values.EnableVendorBridge,
+            v => _settings.Values.EnableVendorBridge = v);
+        var bridgePath = Label(@"%LOCALAPPDATA%\ChargeTray\vendor-bridge.json", 23, 135, 585, 25, 9, muted: true);
+        vendor.Controls.Add(bridgePath);
+        _settingsList.Controls.Add(vendor);
 
         var battery = Group("История и производительность", "Сохраняем статистику только на вашем компьютере.", 192);
         Toggle(battery, "Локальная история до 30 дней", 83, _settings.Values.BatteryHistory,
@@ -587,12 +617,76 @@ internal sealed class DeviceHubForm : Form {
         _diagnosticsList.Controls.Add(support);
     }
 
+    private void BuildProtocolLab() {
+        _labList.Controls.Clear();
+        var intro = Group("Protocol Lab · безопасный режим",
+            "Снимки состояния до и после подключения USB или запуска фирменного ПО.", 200);
+        var baseline = new FluentButton("1 · Снять состояние ДО") {
+            Left = 18, Top = 86, Width = 268, Height = 42
+        };
+        baseline.Click += (_, _) => {
+            _labSnapshots.Clear();
+            _labSnapshots.Add(ProtocolLab.Capture(_devices, _hardwareInfo, DateTime.UtcNow));
+            if (_labOutput is not null) _labOutput.Text = "Снимок ДО сохранён. Измените состояние устройства, нажмите «Обновить», затем сделайте снимок ПОСЛЕ.";
+        };
+        intro.Controls.Add(baseline);
+        var after = new FluentButton("2 · Снять состояние ПОСЛЕ") {
+            Left = 301, Top = 86, Width = 280, Height = 42
+        };
+        after.Click += (_, _) => {
+            if (_labSnapshots.Count == 0) {
+                MessageBox.Show(this, "Сначала снимите состояние ДО.", "Protocol Lab"); return;
+            }
+            var sample = ProtocolLab.Capture(_devices, _hardwareInfo, DateTime.UtcNow);
+            if (_labSnapshots.Count == 1) _labSnapshots.Add(sample);
+            else _labSnapshots[1] = sample;
+            if (_labOutput is not null) _labOutput.Text = string.Join(Environment.NewLine,
+                ProtocolLab.Compare(_labSnapshots[0], _labSnapshots[1]).Changes);
+        };
+        intro.Controls.Add(after);
+        var save = new FluentButton("Экспортировать сравнение JSON") {
+            Left = 18, Top = 142, Width = 326, Height = 40
+        };
+        save.Click += (_, _) => {
+            if (_labSnapshots.Count < 2) {
+                MessageBox.Show(this, "Для экспорта нужны два снимка.", "Protocol Lab"); return;
+            }
+            using var dialog = new SaveFileDialog {
+                Filter = "JSON (*.json)|*.json", FileName = "ChargeTray-ProtocolLab.json",
+                Title = "Экспорт обезличенного сравнения"
+            };
+            if (dialog.ShowDialog(this) == DialogResult.OK) {
+                try { File.WriteAllText(dialog.FileName,
+                    ProtocolLab.ExportJson(ProtocolLab.Compare(_labSnapshots[0], _labSnapshots[1]))); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+                    MessageBox.Show(this, "Не удалось записать файл: " + e.Message, "Protocol Lab");
+                }
+            }
+        };
+        intro.Controls.Add(save);
+        _labList.Controls.Add(intro);
+
+        var output = Group("Изменения между снимками",
+            "Показываются только уже доступные Windows/HID сведения; неизвестные команды не отправляются.", 355);
+        _labOutput = new TextBox {
+            Left = 20, Top = 88, Width = 590, Height = 234,
+            ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical,
+            BorderStyle = BorderStyle.None, Font = new Font("Consolas", 10),
+            BackColor = FluentStyle.SurfaceHover, ForeColor = FluentStyle.Text,
+            Text = "1. Сделайте первый снимок.\r\n2. Подключите зарядку или запустите OEM-приложение.\r\n3. Нажмите «Обновить».\r\n4. Снимите состояние после изменения."
+        };
+        output.Controls.Add(_labOutput);
+        output.Resize += (_, _) => _labOutput.Width = Math.Max(250, output.Width - 41);
+        _labList.Controls.Add(output);
+    }
+
     internal void ThemeFrame() {
         if (!Visible || IsDisposed || !AccentTheme.RgbEnabled || _settings.Values.EconomyMode) return;
         foreach (var button in _nav.Values) button.Invalidate();
         var flow = _selected switch {
             "devices" => _deviceList, "history" => _historyList,
-            "appearance" => _styleList, "settings" => _settingsList, _ => _diagnosticsList
+            "appearance" => _styleList, "settings" => _settingsList,
+            "diagnostics" => _diagnosticsList, _ => _labList
         };
         foreach (Control c in flow.Controls) {
             if (c is not FluentCard card || card.Bottom < 0 || card.Top > flow.ClientSize.Height) continue;
@@ -616,7 +710,7 @@ internal sealed class DeviceHubForm : Form {
         _header.BackColor = FluentStyle.Background;
         _content.BackColor = FluentStyle.Background;
         foreach (var page in _pages.Values) page.BackColor = FluentStyle.Background;
-        foreach (var flow in new[] {_deviceList,_historyList,_styleList,_settingsList,_diagnosticsList}) {
+        foreach (var flow in new[] {_deviceList,_historyList,_styleList,_settingsList,_diagnosticsList,_labList}) {
             flow.BackColor = FluentStyle.Background;
             foreach (Control card in flow.Controls) {
                 if (card is FluentCard) {
@@ -627,9 +721,16 @@ internal sealed class DeviceHubForm : Form {
                         if (child is NumericUpDown number) { number.BackColor = FluentStyle.SurfaceHover; number.ForeColor = FluentStyle.Text; }
                     }
                 }
+                foreach (Control nested in card.Controls) {
+                    if (nested is FlowLayoutPanel palettePanel) {
+                        palettePanel.BackColor = FluentStyle.Surface;
+                        foreach (Control chip in palettePanel.Controls) chip.Invalidate();
+                    }
+                }
                 card.Invalidate(true);
             }
         }
+        foreach (var chip in _colorChips) chip.Invalidate();
         Invalidate(true);
     }
 
