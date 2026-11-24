@@ -38,7 +38,7 @@ sealed class TrayApp : ApplicationContext {
     private readonly ToolStripMenuItem _extra = new("Отдельный значок для каждого устройства");
     private readonly ToolStripMenuItem _colors = new("Оформление и RGB");
     private readonly ToolStripMenuItem _rgbItem = new("Плавная RGB-анимация");
-    private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 50 };
+    private readonly System.Windows.Forms.Timer _themeTimer = new() { Interval = 16 };
     private readonly Dictionary<string, (NotifyIcon Tray, Icon Icon, string Signature)> _icons = new();
     private readonly HashSet<string> _customAlerted = new(StringComparer.OrdinalIgnoreCase);
     private readonly SettingsStore _prefs = new();
@@ -231,6 +231,13 @@ sealed class TrayApp : ApplicationContext {
             var oldKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _data = _prefs.Apply(next);
             if (_seenFirstScan && _prefs.Values.ConnectionNotifications) {
+                var previously = _data.ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
+                var charging = _data.Where(d => d.Charging &&
+                    (!previously.TryGetValue(d.Key, out var prior) || !prior.Charging)).Take(2).ToArray();
+                if (charging.Length > 0)
+                    _main.ShowBalloonTip(3500, "ChargeTray · зарядка",
+                        string.Join("\n", charging.Select(d => "⚡ Заряжается: " + Trim(d.Name, 35))),
+                        ToolTipIcon.Info);
                 var newKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var added = _data.Where(d => !oldKeys.Contains(d.Key)).Take(3).ToArray();
                 var removed = oldKeys.Where(k => !newKeys.Contains(k)).Take(3).ToArray();
