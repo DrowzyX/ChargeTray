@@ -220,14 +220,14 @@ internal sealed class DeviceHubForm : Form {
     }
     private FluentCard DeviceCard(Accessory d) {
         var card = NewCard(218);
-        card.Controls.Add(Label(Icon(d.Type), 20, 15, 35, 31, 18, true));
-        var name = Label(d.Name, 63, 16, 420, 31, 13, true);
+        card.Controls.Add(new DeviceGlyphIcon(d.Type) { Left = 19, Top = 16, Width = 38, Height = 38 });
+        var name = Label(d.Name, 73, 16, 410, 31, 13, true);
         card.Controls.Add(name);
-        var connection = Label(d.Type + "  ·  " + d.Via, 64, 46, 510, 22, 9, muted: true);
+        var connection = Label(d.Type + "  ·  " + d.Via, 74, 46, 510, 22, 9, muted: true);
         card.Controls.Add(connection);
         if (d.Charging || d.Key == "aula:f108-pro") {
             var status = Label(d.Charging ? "⚡ Заряжается (подтверждено устройством)" :
-                (d.Detail ?? "Статус зарядки неизвестен"), 64, 68, 510, 20, 9, muted: true);
+                (d.Detail ?? "Статус зарядки неизвестен"), 74, 68, 510, 20, 9, muted: true);
             status.ForeColor = d.Charging ? Color.FromArgb(115, 230, 166) :
                 d.Detail?.StartsWith("⚡?") == true ? AccentTheme.Accent : FluentStyle.Muted;
             card.Controls.Add(status);
@@ -285,11 +285,6 @@ internal sealed class DeviceHubForm : Form {
         card.Resize += (_, _) => graph.Width = card.ClientSize.Width - 45;
         return card;
     }
-    private static string Icon(DeviceType type) => type switch {
-        DeviceType.Keyboard => "⌨", DeviceType.Mouse => "◉",
-        DeviceType.Headphones => "♫", DeviceType.Controller => "✚",
-        DeviceType.SystemBattery => "▣", _ => "◈"
-    };
     private void SizeCards() {
         if (_selected == "devices") SizeCards(_deviceList);
         if (_selected == "history") SizeCards(_historyList);
