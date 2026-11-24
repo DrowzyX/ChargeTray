@@ -187,4 +187,37 @@ Verify(XentaBatteryPacket.RejectionReason(unknownXenta).Contains("0xF3") &&
     "Xenta diagnostic explains the unrecognized F3 status");
 Verify(XentaBatteryPacket.RejectionReason([0x03, 0x55, 0x40, 0x01, 62])
     .Contains("валидный"), "Valid Xenta packet is recognized");
+var intelligenceTime = new DateTime(2026, 11, 24, 19, 0, 0, DateTimeKind.Utc);
+var deviceForBridge = new Accessory("community:A8A5:2255", "Wireless Mouse", DeviceType.Mouse,
+    "USB / ресивер", 44);
+var chosenBridge = BatterySourceResolver.Resolve([deviceForBridge], [
+    new BatteryObservation("community:A8A5:2255", 76, intelligenceTime.AddSeconds(-10),
+        "Vendor Bridge", false, 95)
+], intelligenceTime);
+Verify(chosenBridge[0].Percent == 76 && chosenBridge[0].ReadingSource == "Vendor Bridge",
+    "Opted-in fresh vendor observation can override a native reading");
+var oldBridge = BatterySourceResolver.Resolve([deviceForBridge], [
+    new BatteryObservation("community:A8A5:2255", 99, intelligenceTime.AddMinutes(-5),
+        "Vendor Bridge", true, 95)
+], intelligenceTime);
+Verify(oldBridge[0].Percent == 44 && !oldBridge[0].Charging,
+    "Stale vendor observations cannot change the device state");
+var unknownBridge = BatterySourceResolver.Resolve([deviceForBridge], [
+    new BatteryObservation("community:UNKNOWN", 100, intelligenceTime, "Vendor Bridge", true, 95)
+], intelligenceTime);
+Verify(unknownBridge.Length == 1 && unknownBridge[0].Percent == 44,
+    "Vendor bridge cannot create phantom devices");
+Verify(BatterySourceResolver.Choose("test", [
+    new BatteryObservation("test", 999, intelligenceTime, "Vendor Bridge", true, 95)
+], intelligenceTime) is null, "Invalid vendor percent is rejected");
+var labBefore = ProtocolLab.Capture([deviceForBridge],
+    ["Bluetooth AA:BB:CC:DD:EE:FF", @"HID\VID_1234&PID_5678"], intelligenceTime);
+var labAfter = ProtocolLab.Capture([deviceForBridge with { Percent = 77 }],
+    ["USB | HID device"], intelligenceTime.AddMinutes(1));
+var labChanges = ProtocolLab.Compare(labBefore, labAfter);
+Verify(labChanges.Changes.Any(x => x.Contains("44%") && x.Contains("77%")),
+    "Protocol Lab compares battery changes");
+Verify(!ProtocolLab.ExportJson(labChanges).Contains("AA:BB:CC:DD:EE:FF") &&
+    !ProtocolLab.ExportJson(labChanges).Contains(@"HID\VID_1234"),
+    "Protocol Lab redacts MAC addresses and instance paths");
 Console.WriteLine($"{assertions} checks passed.");
