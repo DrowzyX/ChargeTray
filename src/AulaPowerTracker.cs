@@ -12,7 +12,7 @@ internal sealed class AulaPowerTracker {
     internal bool LikelyCharging { get; private set; }
 
     internal void Observe(int? percent, bool stale, DateTime utcNow) {
-        if (stale || percent is not >= 1 and <= 100) return;
+        if (stale || percent is null || percent < 1 || percent > 100) return;
 
         // Prevent stale cached readings and repeated UI polls from accumulating evidence.
         if (_previousPercent is null || utcNow - _previousUtc > TimeSpan.FromHours(2)) {
