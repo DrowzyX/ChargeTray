@@ -121,7 +121,9 @@ internal sealed class DeviceHubForm : Form {
     private void FillCards(FlowLayoutPanel flow, bool history) {
         flow.SuspendLayout();
         try {
+            var oldControls = flow.Controls.Cast<Control>().ToArray();
             flow.Controls.Clear();
+            foreach (var old in oldControls) old.Dispose();
             foreach (var device in _devices) {
                 var card = MakeCard(device, history);
                 card.Width = Math.Max(440, flow.ClientSize.Width - 31);
