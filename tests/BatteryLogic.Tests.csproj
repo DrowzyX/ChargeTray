@@ -14,5 +14,6 @@
     <Compile Include="../src/AulaReadingCache.cs" Link="AulaReadingCache.cs" />
     <Compile Include="../src/XentaBatteryPacket.cs" Link="XentaBatteryPacket.cs" />
     <Compile Include="../src/XentaFrameConfirmation.cs" Link="XentaFrameConfirmation.cs" />
+    <Compile Include="../src/AccentTheme.cs" Link="AccentTheme.cs" />
   </ItemGroup>
 </Project>
