@@ -205,7 +205,7 @@ internal sealed class DeviceHubForm : Form {
         return label;
     }
     private FluentCard DeviceCard(Accessory d) {
-        var card = NewCard(169);
+        var card = NewCard(199);
         card.Controls.Add(Label(Icon(d.Type), 20, 15, 35, 31, 18, true));
         var name = Label(d.Name, 63, 16, 420, 31, 13, true);
         card.Controls.Add(name);
@@ -227,15 +227,17 @@ internal sealed class DeviceHubForm : Form {
             pref.Name = rename.Text.Trim();
             _settings.Save();
             PreferencesChanged?.Invoke();
+            name.Text = string.IsNullOrWhiteSpace(pref.Name) ? d.Name : pref.Name;
         };
         card.Controls.Add(rename);
-        var pin = new FluentToggle("Закрепить", pref.Pinned) { Left = 330, Top = 102, Width = 139, Height = 33 };
+        var pin = new FluentToggle("Закрепить", pref.Pinned) { Left = 22, Top = 140, Width = 155, Height = 36 };
         pin.ValueChanged += value => {
             pref.Pinned = value; _settings.Save(); PreferencesChanged?.Invoke();
+            if (!IsDisposed) BeginInvoke((Action)RefreshLists);
         };
         card.Controls.Add(pin);
-        card.Controls.Add(Label("Порог", 477, 110, 50, 22, 9, muted: true));
-        var threshold = new NumericUpDown { Left = 531, Top = 105, Width = 66, Height = 27,
+        card.Controls.Add(Label("Порог", 211, 147, 55, 22, 9, muted: true));
+        var threshold = new NumericUpDown { Left = 271, Top = 143, Width = 72, Height = 27,
             Minimum = 1, Maximum = 99, Value = Math.Clamp(pref.AlertThreshold, 1, 99),
             BackColor = FluentStyle.SurfaceHover, ForeColor = FluentStyle.Text };
         threshold.ValueChanged += (_, _) => {
@@ -246,7 +248,7 @@ internal sealed class DeviceHubForm : Form {
             percent.Left = card.ClientSize.Width - 150;
             bar.Width = card.ClientSize.Width - 46;
             name.Width = Math.Max(160, card.ClientSize.Width - 260);
-            threshold.Left = card.ClientSize.Width - 92;
+            threshold.Left = 271;
         };
         return card;
     }
