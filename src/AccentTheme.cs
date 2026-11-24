@@ -62,8 +62,8 @@ internal static class AccentTheme {
         double x = 1 - Math.Abs((hue % 2) - 1);
         // Soft pastel RGB on graphite UI; keep text contrast high.
         (double r, double g, double b) = section switch {
-            0 => (1, x, 0), 1 => (x, 1, 0), 2 => (0, 1, x),
-            3 => (0, x, 1), 4 => (x, 0, 1), _ => (1, 0, x)
+            0 => (1.0, x, 0.0), 1 => (x, 1.0, 0.0), 2 => (0.0, 1.0, x),
+            3 => (0.0, x, 1.0), 4 => (x, 0.0, 1.0), _ => (1.0, 0.0, x)
         };
         return Color.FromArgb((int)(110 + r * 135), (int)(110 + g * 135), (int)(110 + b * 135));
     }
