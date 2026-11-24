@@ -16,6 +16,8 @@ sealed class BatteryReader : IDisposable {
     internal string[] HardwareDiagnostics { get; private set; } = [];
     private readonly RazerReceiver[] _razer = RazerModels.Receivers.Select(m => new RazerReceiver(m)).ToArray();
     private readonly AulaF108 _aula = new();
+    private readonly AulaPowerTracker _aulaPower = new();
+    private bool _aulaWasConnected;
     private readonly XentaReceiver _xenta = new();
     internal bool RetryAulaSoon => _aula.RetrySoon;
     private readonly Dictionary<string, (DateTime Next, int? Value, string? Model)> _ble = new();
@@ -102,21 +104,36 @@ sealed class BatteryReader : IDisposable {
             connected.Add(new("razer:" + model.Hardware, model.Name, DeviceType.Mouse,
                 level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет ответа мыши", level));
         }
-        if (aula.Receiver) {
-            HardwareDiagnostics = [..HardwareDiagnostics, $"AULA 2.4 ГГц | {AulaF108.Name} | {AulaF108.Id} | {aula.Details}"];
-            // Some F108 Pro keyboards expose 0C45:800A in USB data mode.
-            // Presence of that HID interface means a USB connection, NOT
-            // verified battery charging (power-only cables are invisible).
-            var wired = RazerReceiver.PresentInterfaces(p =>
-                p.StartsWith(@"\\?\hid#vid_0c45&pid_800a", StringComparison.OrdinalIgnoreCase));
+        // USB data mode can be visible without the wireless receiver. USB
+        // detection does not prove that the cell is charging.
+        var wired = RazerReceiver.PresentInterfaces(p =>
+            p.StartsWith(@"\\?\hid#vid_0c45&pid_800a", StringComparison.OrdinalIgnoreCase));
+        if (aula.Receiver || wired.Length > 0) {
+            if (aula.Receiver)
+                HardwareDiagnostics = [..HardwareDiagnostics, $"AULA 2.4 ГГц | {AulaF108.Name} | {AulaF108.Id} | {aula.Details}"];
             HardwareDiagnostics = [..HardwareDiagnostics, "AULA USB data cable | " +
                 (wired.Length > 0 ? "detected 0C45:800A; charging is unconfirmed" :
                     "not visible to Windows; power-only cable cannot be detected")];
-            int? level = aula.Percent ?? hid.FirstOrDefault(x => AulaF108.IsKnownInput(x) && x.Percent.HasValue)?.Percent;
+            int? level = aula.Receiver ? aula.Percent ?? hid.FirstOrDefault(x => AulaF108.IsKnownInput(x) && x.Percent.HasValue)?.Percent : null;
+            if (!_aulaWasConnected) _aulaPower.Reset();
+            _aulaWasConnected = true;
+            _aulaPower.Observe(level, aula.Stale, DateTime.UtcNow);
+            bool usbConnected = wired.Length > 0;
+            string powerStatus = _aulaPower.LikelyCharging
+                ? "⚡? Вероятно заряжается (по росту процента)"
+                : usbConnected ? "USB подключён · зарядка не подтверждена"
+                : "Статус зарядки неизвестен";
+            HardwareDiagnostics = [..HardwareDiagnostics,
+                "AULA charging inference | " + powerStatus +
+                " | USB data=" + (usbConnected ? "yes" : "no") +
+                " | источник: только процент батареи; без подтверждённого флага зарядки"];
             connected.Add(new("aula:f108-pro", AulaF108.Name, DeviceType.Keyboard,
+                !aula.Receiver ? "USB-кабель" :
                 aula.Stale ? "Донгл 2,4 ГГц · последнее показание" :
-                level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет показаний", level, IsStale: aula.Stale));
+                level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет показаний", level,
+                Detail: powerStatus, IsStale: aula.Stale));
         }
+        if (!aula.Receiver) { _aulaWasConnected = false; _aulaPower.Reset(); }
         if (WindowsBattery.Read() is { } batteryDevice) connected.Add(batteryDevice);
         return MergeControllers(connected).OrderBy(d => d.Type).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }

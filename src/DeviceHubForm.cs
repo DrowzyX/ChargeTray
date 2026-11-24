@@ -219,21 +219,29 @@ internal sealed class DeviceHubForm : Form {
         return label;
     }
     private FluentCard DeviceCard(Accessory d) {
-        var card = NewCard(199);
+        var card = NewCard(218);
         card.Controls.Add(Label(Icon(d.Type), 20, 15, 35, 31, 18, true));
         var name = Label(d.Name, 63, 16, 420, 31, 13, true);
         card.Controls.Add(name);
-        card.Controls.Add(Label(d.Type + "  ·  " + d.Via + (d.Charging ? "  ·  ⚡ Заряжается" : d.Key == "aula:f108-pro" ? "  ·  Зарядка: статус неизвестен" : ""),
-            64, 48, 510, 24, 9, muted: true));
+        var connection = Label(d.Type + "  ·  " + d.Via, 64, 46, 510, 22, 9, muted: true);
+        card.Controls.Add(connection);
+        if (d.Charging || d.Key == "aula:f108-pro") {
+            var status = Label(d.Charging ? "⚡ Заряжается (подтверждено устройством)" :
+                (d.Detail ?? "Статус зарядки неизвестен"), 64, 68, 510, 20, 9, muted: true);
+            status.ForeColor = d.Charging ? Color.FromArgb(115, 230, 166) :
+                d.Detail?.StartsWith("⚡?") == true ? AccentTheme.Accent : FluentStyle.Muted;
+            card.Controls.Add(status);
+            card.Resize += (_, _) => status.Width = Math.Max(180, card.ClientSize.Width - 95);
+        }
         var percent = Label(d.Reading, 505, 17, 115, 33, 18, true);
         percent.TextAlign = ContentAlignment.TopRight;
         card.Controls.Add(percent);
         var bar = new BatteryProgress { Percent = d.IsStale ? null : d.Percent, Low = d.Low,
-            Bounds = new Rectangle(22, 82, 590, 8) };
+            Bounds = new Rectangle(22, 102, 590, 8) };
         card.Controls.Add(bar);
         var pref = _settings.Device(d.Key);
-        card.Controls.Add(Label("Название", 22, 111, 72, 24, 9, muted: true));
-        var rename = new TextBox { Left = 98, Top = 106, Width = 220, Height = 27,
+        card.Controls.Add(Label("Название", 22, 131, 72, 24, 9, muted: true));
+        var rename = new TextBox { Left = 98, Top = 126, Width = 220, Height = 27,
             Text = pref.Name, PlaceholderText = d.Name, BackColor = FluentStyle.SurfaceHover,
             ForeColor = FluentStyle.Text, BorderStyle = BorderStyle.FixedSingle };
         rename.Leave += (_, _) => {
@@ -244,14 +252,14 @@ internal sealed class DeviceHubForm : Form {
             name.Text = string.IsNullOrWhiteSpace(pref.Name) ? d.Name : pref.Name;
         };
         card.Controls.Add(rename);
-        var pin = new FluentToggle("Закрепить", pref.Pinned) { Left = 22, Top = 140, Width = 155, Height = 36 };
+        var pin = new FluentToggle("Закрепить", pref.Pinned) { Left = 22, Top = 160, Width = 155, Height = 36 };
         pin.ValueChanged += value => {
             pref.Pinned = value; _settings.Save(); PreferencesChanged?.Invoke();
             if (!IsDisposed) BeginInvoke((Action)RefreshLists);
         };
         card.Controls.Add(pin);
-        card.Controls.Add(Label("Порог", 211, 147, 55, 22, 9, muted: true));
-        var threshold = new NumericUpDown { Left = 271, Top = 143, Width = 72, Height = 27,
+        card.Controls.Add(Label("Порог", 211, 167, 55, 22, 9, muted: true));
+        var threshold = new NumericUpDown { Left = 271, Top = 163, Width = 72, Height = 27,
             Minimum = 1, Maximum = 99, Value = Math.Clamp(pref.AlertThreshold, 1, 99),
             BackColor = FluentStyle.SurfaceHover, ForeColor = FluentStyle.Text };
         threshold.ValueChanged += (_, _) => {
@@ -262,6 +270,7 @@ internal sealed class DeviceHubForm : Form {
             percent.Left = card.ClientSize.Width - 150;
             bar.Width = card.ClientSize.Width - 46;
             name.Width = Math.Max(160, card.ClientSize.Width - 260);
+            connection.Width = Math.Max(180, card.ClientSize.Width - 95);
             threshold.Left = 271;
         };
         return card;

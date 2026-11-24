@@ -243,6 +243,24 @@ sealed class TrayApp : ApplicationContext {
                     _main.ShowBalloonTip(3500, "ChargeTray · зарядка",
                         string.Join("\n", charging.Select(d => "⚡ Заряжается: " + Trim(d.Name, 35))),
                         ToolTipIcon.Info);
+                // Explicitly differentiate observed wired USB data connection
+                // from an unverified charge estimate on a 2.4 GHz dongle.
+                var aulaNow = _data.FirstOrDefault(d => d.Key == "aula:f108-pro");
+                if (aulaNow is not null && oldReadings.TryGetValue(aulaNow.Key, out var aulaPrev)) {
+                    bool usbNow = aulaNow.Detail?.StartsWith("USB подключён", StringComparison.Ordinal) == true;
+                    bool usbBefore = aulaPrev.Detail?.StartsWith("USB подключён", StringComparison.Ordinal) == true;
+                    bool risingNow = aulaNow.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
+                    bool risingBefore = aulaPrev.Detail?.StartsWith("⚡? Вероятно", StringComparison.Ordinal) == true;
+                    if (usbNow && !usbBefore) {
+                        _main.ShowBalloonTip(4000, "ChargeTray · AULA F108 Pro",
+                            "USB-кабель обнаружен. Зарядка батареи не подтверждена.", ToolTipIcon.Info);
+                        _island.Pulse();
+                    } else if (risingNow && !risingBefore) {
+                        _main.ShowBalloonTip(4000, "ChargeTray · AULA F108 Pro",
+                            "⚡? Процент последовательно растёт — возможно, клавиатура заряжается.", ToolTipIcon.Info);
+                        _island.Pulse();
+                    }
+                }
                 var newKeys = _data.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var added = _data.Where(d => !oldKeys.Contains(d.Key)).Take(3).ToArray();
                 var removed = oldKeys.Where(k => !newKeys.Contains(k)).Take(3).ToArray();

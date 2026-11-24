@@ -12,6 +12,7 @@
     <Compile Include="../src/WindowsBattery.cs" Link="WindowsBattery.cs" />
     <Compile Include="../src/RazerModels.cs" Link="RazerModels.cs" />
     <Compile Include="../src/AulaReadingCache.cs" Link="AulaReadingCache.cs" />
+    <Compile Include="../src/AulaPowerTracker.cs" Link="AulaPowerTracker.cs" />
     <Compile Include="../src/XentaBatteryPacket.cs" Link="XentaBatteryPacket.cs" />
     <Compile Include="../src/XentaFrameConfirmation.cs" Link="XentaFrameConfirmation.cs" />
     <Compile Include="../src/AccentTheme.cs" Link="AccentTheme.cs" />
