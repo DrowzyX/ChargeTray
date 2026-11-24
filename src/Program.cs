@@ -226,7 +226,7 @@ sealed class TrayApp : ApplicationContext {
         _busy = true;
         _panel.UpdateData(_data, true, _updated, _demo, _errors);
         try {
-            var next = _demo ? Samples() : await Task.Run(() => _reader.Read(force));
+            var next = _demo ? Samples() : await Task.Run(() => _reader.Read(force, _prefs.Values.EnableVendorBridge));
             if (_exiting) return;
             _errors = _demo ? [] : _reader.Errors.ToArray();
             _hardware = _demo ? [] : _reader.HardwareDiagnostics;
