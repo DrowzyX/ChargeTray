@@ -105,4 +105,23 @@ Verify(!AccentTheme.TryParse("#GGCC11", out _) && !AccentTheme.TryParse("123", o
     "Invalid accent color settings are rejected");
 Verify(AccentTheme.Rainbow(0).ToArgb() == AccentTheme.Rainbow(9000).ToArgb(),
     "Animated RGB loop repeats after nine seconds");
+var prefs = new SettingsStore();
+var profile = prefs.Device("test2:keyboard");
+profile.Name = "Клавиатура пользователя";
+profile.Pinned = true;
+profile.AlertThreshold = 8;
+var applied = prefs.Apply([new Accessory("test2:mouse", "Мышь", DeviceType.Mouse, "USB"),
+    new Accessory("test2:keyboard", "Оригинальная клавиатура", DeviceType.Keyboard, "Bluetooth", 70)]);
+Verify(applied.Length == 2 && applied[0].Name == "Клавиатура пользователя",
+    "Custom name and pinned device ordering");
+Verify(prefs.Threshold("test2:keyboard") == 8 && prefs.Threshold("test2:mouse") == 15,
+    "Per-device alert threshold and default");
+Verify(DeviceCatalog.TryGet("1D57:FA60", out var profileF) &&
+    profileF.Name.Contains("1D57:FA60"), "Generic dongle does not assume ARDOR brand");
+Verify(!DeviceCatalog.TryGet("FFFF:9999", out _), "Unknown VID/PID has no invented known model");
+Verify(ReleaseUpdates.IsNewer("v2.1.0", new Version(2, 0, 0)) &&
+    !ReleaseUpdates.IsNewer("v1.4.0", new Version(2, 0, 0)),
+    "GitHub release comparison detects only upgrades");
+Verify(new BatteryHistory().Forecast("does-not-exist").Contains("Недостаточно"),
+    "Battery lifetime estimation refuses insufficient data");
 Console.WriteLine($"{assertions} checks passed.");
