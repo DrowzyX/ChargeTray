@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace ChargeTray;
 
@@ -11,9 +12,24 @@ internal static class AccentTheme {
     private static readonly string SettingFile = Path.Combine(SettingsDir, "accent-v1.txt");
     private static Color _color = Color.FromArgb(226, 197, 160);
     private static bool _rgb;
+    private static bool _systemAccent;
+    internal static bool SystemAccentEnabled => _systemAccent;
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmGetColorizationColor(out uint colorization, out bool opaque);
     private static int _cycleSeconds = 9;
     internal static int CycleSeconds => _cycleSeconds;
-    internal static Color Accent => _rgb ? Rainbow(Environment.TickCount64) : _color;
+    internal static Color Accent => _rgb ? Rainbow(Environment.TickCount64) :
+        _systemAccent ? SystemAccent() : _color;
+    private static Color SystemAccent() {
+        try {
+            if (DwmGetColorizationColor(out uint value, out _) == 0) {
+                Color c = Color.FromArgb((int)(value & 0xFFFFFF) | unchecked((int)0xFF000000));
+                if (c.GetBrightness() < .25f) return Color.FromArgb(Math.Min(255, c.R + 85), Math.Min(255, c.G + 85), Math.Min(255, c.B + 85));
+                return c;
+            }
+        } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
+        return _color;
+    }
     internal static bool RgbEnabled => _rgb;
     internal static Color Fixed => _color;
 
@@ -25,6 +41,7 @@ internal static class AccentTheme {
             if (TryParse(lines[0], out var color)) _color = color;
             _rgb = lines.Length > 1 && lines[1] == "rgb";
             if (lines.Length > 2 && int.TryParse(lines[2], out int seconds)) _cycleSeconds = Math.Clamp(seconds, 4, 30);
+            _systemAccent = lines.Length > 3 && lines[3] == "system";
         } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
@@ -41,9 +58,11 @@ internal static class AccentTheme {
     internal static void SetColor(Color value) {
         _color = Color.FromArgb(value.R, value.G, value.B);
         _rgb = false;
+        _systemAccent = false;
         Save();
     }
-    internal static void SetRgb(bool enabled) { _rgb = enabled; Save(); }
+    internal static void SetRgb(bool enabled) { _rgb = enabled; if (enabled) _systemAccent = false; Save(); }
+    internal static void SetSystemAccent(bool enabled) { _systemAccent = enabled; if (enabled) _rgb = false; Save(); }
     internal static void SetCycleSeconds(int seconds) { _cycleSeconds = Math.Clamp(seconds, 4, 30); Save(); }
     internal static void Reset() {
         _color = Color.FromArgb(226, 197, 160);
@@ -54,7 +73,7 @@ internal static class AccentTheme {
     private static void Save() {
         try {
             Directory.CreateDirectory(SettingsDir);
-            File.WriteAllLines(SettingFile, new[] { $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}", _rgb ? "rgb" : "solid", _cycleSeconds.ToString() });
+            File.WriteAllLines(SettingFile, new[] { $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}", _rgb ? "rgb" : "solid", _cycleSeconds.ToString(), _systemAccent ? "system" : "custom" });
         } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
