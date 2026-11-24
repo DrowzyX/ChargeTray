@@ -159,13 +159,14 @@ sealed class ChargeIsland : Form {
         g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         float w = Width / _scale, h = Height / _scale, center = w / 2f;
         var shadow = Color.FromArgb(25, 24, 28);
-        var champagne = Color.FromArgb(228, 198, 164);
+        var champagne = AccentTheme.Accent;
         var muted = Color.FromArgb(169, 156, 151);
         var coral = Color.FromArgb(248, 153, 159);
-        using (var fill = new LinearGradientBrush(new RectangleF(0, 0, w, h), Color.FromArgb(35, 32, 35), shadow, 90))
+        using (var fill = new LinearGradientBrush(new RectangleF(0, 0, w, h),
+            Color.FromArgb((champagne.R + 35 * 9) / 10, (champagne.G + 32 * 9) / 10, (champagne.B + 35 * 9) / 10), shadow, 90))
             g.FillRectangle(fill, 0, 0, w, h);
         using var contour = Shapes.Round(new RectangleF(.55f, .55f, w - 1.1f, h - 1.1f), (h - 1.1f) / 2f - .35f);
-        using var border = new Pen(Color.FromArgb(83, 71, 68));
+        using var border = new Pen(Color.FromArgb(115, AccentTheme.Accent));
         g.DrawPath(border, contour);
 
         float compactAlpha = 1 - Math.Clamp((_progress - .12f) / .53f, 0, 1);
