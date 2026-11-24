@@ -10,7 +10,8 @@ using Windows.Storage.Streams;
 
 namespace ChargeTray;
 
-sealed class BatteryReader {
+sealed class BatteryReader : IDisposable {
+    public void Dispose() => _xenta.Dispose();
     internal readonly List<string> Errors = new();
     internal string[] HardwareDiagnostics { get; private set; } = [];
     private readonly RazerReceiver[] _razer = RazerModels.Receivers.Select(m => new RazerReceiver(m)).ToArray();
