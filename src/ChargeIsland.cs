@@ -18,6 +18,8 @@ sealed class ChargeIsland : Form {
     private Accessory[] _readings = [];
     private int _deviceCount;
     private bool _enabled, _inside, _low;
+    private DateTime _pulseUntil;
+    internal int MonitorIndex { get; set; }
     private float _progress, _from, _target, _scale = 1, _openWidth = 180;
     internal event Action<Point>? OpenPanel;
 
@@ -31,7 +33,10 @@ sealed class ChargeIsland : Form {
         AutoScaleMode = AutoScaleMode.None;
         Cursor = Cursors.Hand;
         BackColor = Color.FromArgb(22, 21, 24);
-        _visibility.Tick += (_, _) => Place();
+        _visibility.Tick += (_, _) => {
+            if (!_inside && _target > 0 && DateTime.UtcNow >= _pulseUntil) Transition(0);
+            Place();
+        };
         _motion = new System.Threading.Timer(_ => PostFrame(), null, Timeout.Infinite, Timeout.Infinite);
         DpiChanged += (_, _) => { if (Visible) BeginInvoke((Action)Place); };
     }
@@ -59,11 +64,18 @@ sealed class ChargeIsland : Form {
         if (Visible) Invalidate();
     }
 
+    internal void Pulse() {
+        if (!_enabled || !SystemInformation.IsMenuAnimationEnabled) return;
+        _pulseUntil = DateTime.UtcNow.AddSeconds(2.6);
+        Transition(1);
+    }
+
     private void Place() => Place(checkFullscreen: true);
 
     private void Place(bool checkFullscreen) {
         if (IsDisposed) return;
-        var screen = Screen.PrimaryScreen;
+        var availableScreens = Screen.AllScreens;
+        var screen = availableScreens.Length == 0 ? null : availableScreens[Math.Clamp(MonitorIndex, 0, availableScreens.Length - 1)];
         if (!_enabled || _deviceCount == 0 || screen is null ||
             checkFullscreen && ChargeStrip.CoversScreen(screen.Bounds, IsHandleCreated ? Handle : IntPtr.Zero)) {
             _inside = false;
@@ -96,7 +108,7 @@ sealed class ChargeIsland : Form {
     protected override void OnMouseLeave(EventArgs e) {
         base.OnMouseLeave(e);
         _inside = false;
-        Transition(0);
+        if (DateTime.UtcNow >= _pulseUntil) Transition(0);
     }
 
     protected override void OnMouseUp(MouseEventArgs e) {
@@ -191,7 +203,9 @@ sealed class ChargeIsland : Form {
             g.Restore(clip);
             return;
         }
-        float targetW = Math.Min(_openWidth, Math.Max(RestW, Screen.PrimaryScreen!.WorkingArea.Width / _scale - 20));
+        var displays = Screen.AllScreens;
+        var display = displays.Length > 0 ? displays[Math.Clamp(MonitorIndex, 0, displays.Length - 1)] : Screen.PrimaryScreen!;
+        float targetW = Math.Min(_openWidth, Math.Max(RestW, display.WorkingArea.Width / _scale - 20));
         int visible = Math.Clamp((int)((targetW - 30) / 70), 1, Math.Min(4, _readings.Length));
         int rest = _readings.Length - visible;
         if (rest > 0 && visible > 1 && 30 + visible * 70 + 26 > targetW) { visible--; rest++; }
