@@ -163,13 +163,13 @@ sealed class BatteryPanel : Form {
         var background = new RectangleF(0, 0, W, h);
         using var wash = new LinearGradientBrush(background, Color.FromArgb(39, 37, 37), Color.FromArgb(18, 18, 21), 65f);
         g.FillRectangle(wash, background);
-        using var border = new Pen(Color.FromArgb(91, 81, 73));
+        using var border = new Pen(Color.FromArgb(95, AccentTheme.Accent));
         using var frame = Shapes.Round(new RectangleF(.5f, .5f, W - 1, h - 1), 22);
         g.DrawPath(border, frame);
-        var champagne = Color.FromArgb(226, 197, 160);
+        var champagne = AccentTheme.Accent;
         var muted = Color.FromArgb(180, 174, 173);
         var white = Color.FromArgb(250, 247, 244);
-        Fill(g, new RectangleF(19, 20, 35, 35), 10, Color.FromArgb(57, 47, 40));
+        Fill(g, new RectangleF(19, 20, 35, 35), 10, Color.FromArgb(35, AccentTheme.Accent));
         TrayArt.Battery(g, new RectangleF(24, 25, 25, 25), champagne);
         DrawText(g, "ChargeTray", 65, 19, 245, 16, white, FontStyle.Bold);
         DrawText(g, _demo ? "РЕЖИМ ДЕМО · ПРИМЕР ДАННЫХ" : "БАТАРЕИ УСТРОЙСТВ", 65, 39, 248, 10, muted);
