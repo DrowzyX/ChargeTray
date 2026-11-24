@@ -277,7 +277,7 @@ sealed class TrayApp : ApplicationContext {
             if (_prefs.Values.BatteryHistory) _history.Observe(_data);
             _updated = DateTime.Now;
             RenderTray();
-            if (_hub?.Visible == true) _hub.UpdateDevices(_data, _updated);
+            if (_hub?.Visible == true) _hub.UpdateDevices(_data, _updated, _hardware);
             if (!_demo) NotifyLow();
         } catch (Exception e) {
             if (_exiting) return;
@@ -330,7 +330,7 @@ sealed class TrayApp : ApplicationContext {
             };
         }
         _hub.ShowHub();
-        _hub.UpdateDevices(_data, _updated);
+        _hub.UpdateDevices(_data, _updated, _hardware);
     }
 
     private async Task CheckUpdatesQuietly() {
