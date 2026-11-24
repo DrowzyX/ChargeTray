@@ -41,7 +41,9 @@ internal static class DeviceCatalog {
     }
     internal static bool TryGet(string hardware, out DeviceProfile profile) {
         EnsureLoaded();
-        return _profiles.TryGetValue(hardware, out profile!);
+        if (_profiles.TryGetValue(hardware, out var found)) { profile = found; return true; }
+        profile = new DeviceProfile();
+        return false;
     }
     internal static DeviceType Type(DeviceProfile profile, DeviceType fallback) =>
         Enum.TryParse<DeviceType>(profile.Type, true, out var value) ? value : fallback;
