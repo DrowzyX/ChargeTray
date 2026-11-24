@@ -87,4 +87,16 @@ Verify(aulaCache.Display(null, now.AddMinutes(3)) == (null, false), "AULA previo
 aulaCache.Record(79, now.AddSeconds(11));
 Verify(aulaCache.Display(79, now.AddSeconds(11)) == (79, false) && aulaCache.Failures == 0, "AULA automatically recovers and resets backoff");
 Verify(!(mouse with { Percent = 5, IsStale = true }).Low && !(mouse with { Percent = 5, IsStale = true }).HasCurrentReading, "Stale charge cannot cause alerts or enter live widgets");
+var xentaConfirm = new XentaFrameConfirmation();
+var time = new DateTime(2026, 11, 23, 0, 0, 0, DateTimeKind.Utc);
+byte[] initialXenta = [0x03, 0x55, 0x40, 0x01, 100];
+byte[] realXenta = [0x03, 0x55, 0x40, 0x01, 62];
+Verify(xentaConfirm.Observe(initialXenta, time) is null, "One transient Xenta 100% frame is ignored");
+Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(2)) is null, "First valid Xenta level awaits confirmation");
+Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(4)) == 62, "Second Xenta level confirms percent");
+Verify(XentaBatteryPacket.Percent([0x03, 0x55, 0x01, 0x00, 0x00]) is null, "Xenta link status is not a battery frame");
+Verify(XentaBatteryPacket.Percent([0x03, 0x55, 0x40, 0x01, 0x00]) is null, "Xenta unknown zero is not a low-battery alarm");
+Verify(XentaBatteryPacket.Percent([0x03, 0x55, 0x40, 0x01, 101]) is null, "Xenta value above 100 is rejected");
+Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(30)) is null, "Separated Xenta frames need fresh confirmation");
+Verify(xentaConfirm.Observe(realXenta, time.AddSeconds(32)) == 62, "Valid report after timeout restores the battery level");
 Console.WriteLine($"{assertions} checks passed.");

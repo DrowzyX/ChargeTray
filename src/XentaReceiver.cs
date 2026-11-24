@@ -1,57 +1,122 @@
-using System.Runtime.InteropServices;
 namespace ChargeTray;
 
-// Read-only HID listener. Never issue a vendor command or modify the HID device.
-internal sealed class XentaReceiver {
-    private Task<(int? Level, string Note)>? _pending;
+// Listen to unsolicited Xenta battery frames without sending device commands.
+// A persistent listener is needed because reports arrive roughly every 2s.
+internal sealed class XentaReceiver : IDisposable {
+    private readonly object _gate = new();
     private string[] _paths = [];
-    private int? _last;
-    private DateTime _lastSeen;
-    internal bool RetrySoon { get; private set; }
-    internal async Task<(bool Found, int? Level, string Details)> Read(bool force) {
+    private CancellationTokenSource? _stop;
+    private Task? _listener;
+    private long _generation;
+    private int? _battery;
+    private DateTime _updatedUtc;
+    private string _details = "ожидание HID-отчёта";
+    private bool _disposed;
+    private static readonly TimeSpan FreshFor = TimeSpan.FromSeconds(45);
+
+    internal Task<(bool Found, int? Level, string Details)> Read(bool force) {
         var paths = RazerReceiver.PresentInterfaces(p =>
             p.StartsWith(@"\\?\hid#vid_1d57&pid_fa60", StringComparison.OrdinalIgnoreCase));
-        if (!_paths.SequenceEqual(paths, StringComparer.OrdinalIgnoreCase)) {
-            _paths = paths; _pending = null; _last = null;
+        lock (_gate) {
+            if (!_paths.SequenceEqual(paths, StringComparer.OrdinalIgnoreCase)) {
+                StopListener();
+                _paths = paths;
+                _battery = null;
+                _updatedUtc = default;
+                _details = "ожидание HID-отчёта";
+            }
+            if (_disposed || paths.Length == 0)
+                return Task.FromResult((false, (int?)null, "ресивер не подключён"));
+
+            if (_listener is null || _listener.IsCompleted) {
+                _stop?.Dispose();
+                _stop = new CancellationTokenSource();
+                var generation = ++_generation;
+                var token = _stop.Token;
+                _listener = Task.Run(() => ListenAsync(paths, generation, token), token);
+            }
+            bool fresh = _battery.HasValue && DateTime.UtcNow - _updatedUtc <= FreshFor;
+            var note = fresh ? $"{_battery}% · подтверждённый HID-отчёт" :
+                _battery.HasValue ? "последний ответ устарел (>45 с); ждём новый HID-отчёт" : _details;
+            return Task.FromResult((true, fresh ? _battery : null, note));
         }
-        if (paths.Length == 0) return (false, null, "не подключён");
-        RetrySoon = _last is null;
-        if (_pending is null && (force || DateTime.UtcNow - _lastSeen > TimeSpan.FromSeconds(15)))
-            _pending = Task.Run(() => ReadOnce(paths));
-        if (_pending is not null) try {
-            // Never block the UI thread for a receiver that's asleep.
-            var answer = await _pending.WaitAsync(TimeSpan.FromMilliseconds(650));
-            _pending = null;
-            if (answer.Level.HasValue) { _last = answer.Level; _lastSeen = DateTime.UtcNow; }
-            return (true, answer.Level ?? (DateTime.UtcNow - _lastSeen < TimeSpan.FromSeconds(90) ? _last : null), answer.Note);
-        } catch (TimeoutException) { return (true, DateTime.UtcNow - _lastSeen < TimeSpan.FromSeconds(90) ? _last : null, "ожидание HID-отчёта"); }
-        catch (Exception e) { _pending = null; return (true, null, e.GetType().Name); }
-        return (true, _last, "ожидание ответа");
     }
-    private static (int?, string) ReadOnce(IEnumerable<string> paths) {
-        foreach (var path in paths) {
-            using var meta = RazerReceiver.Open(path, 0);
-            var caps = RazerReceiver.GetCaps(meta);
-            if (caps is not { Page: 0x000A, Input: 5 }) continue;
-            // Open with read-only access and no output/feature control channel.
-            using var handle = RazerReceiver.Open(path, 0x80000000, overlapped: true);
-            if (handle.IsInvalid) continue;
-            try {
-                using var stream = new FileStream(handle, FileAccess.Read, 5, isAsync: true);
-                using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(1700));
-                byte[] bytes = new byte[5];
-                int confirmed = 0, last = -1;
-                while (!timeout.IsCancellationRequested) {
-                    int received = stream.ReadAsync(bytes, timeout.Token).AsTask().GetAwaiter().GetResult();
-                    if (received != 5) continue;
-                    if (XentaBatteryPacket.Percent(bytes) is not int level) continue;
-                    if (level == last) confirmed++; else { last = level; confirmed = 1; }
-                    if (confirmed >= 2) return (level, $"{level}% · 2 подтверждённых HID-отчёта");
+
+    private async Task ListenAsync(string[] paths, long generation, CancellationToken stop) {
+        while (!stop.IsCancellationRequested) {
+            string? candidate = null;
+            foreach (var path in paths) {
+                using var metadata = RazerReceiver.Open(path, 0);
+                if (RazerReceiver.GetCaps(metadata) is { Page: 0x000A, Usage: 0x0000, Input: 5 }) {
+                    candidate = path;
+                    break;
                 }
-            } catch (OperationCanceledException) { }
-              catch (IOException) { }
-              catch (UnauthorizedAccessException) { }
+            }
+            if (candidate is null) {
+                SetDetail(generation, "HID-коллекция заряда (000A:0000, IN=5) не обнаружена");
+                return;
+            }
+            try {
+                using var handle = RazerReceiver.Open(candidate, 0x80000000, overlapped: true);
+                if (handle.IsInvalid) {
+                    SetDetail(generation, "нет доступа на чтение HID (000A:0000)");
+                } else {
+                    using var stream = new FileStream(handle, FileAccess.Read, 5, isAsync: true);
+                    var confirm = new XentaFrameConfirmation();
+                    var buffer = new byte[5];
+                    SetDetail(generation, "слушаем входящие HID-отчёты (000A:0000)");
+                    while (!stop.IsCancellationRequested) {
+                        int count = await stream.ReadAsync(buffer.AsMemory(), stop).ConfigureAwait(false);
+                        if (count == 0) break;
+                        if (count != 5) continue;
+                        var now = DateTime.UtcNow;
+                        int? level = confirm.Observe(buffer, now);
+                        if (level is not null) {
+                            lock (_gate) {
+                                if (_disposed || generation != _generation) return;
+                                _battery = level;
+                                _updatedUtc = now;
+                                _details = $"{level}% · 2 подтверждённых HID-отчёта";
+                            }
+                        } else if (XentaBatteryPacket.Percent(buffer) is null) {
+                            SetDetailIfEmpty(generation, "пакет заряда не найден; последний HID: " +
+                                Convert.ToHexString(buffer));
+                        }
+                    }
+                }
+            } catch (OperationCanceledException) when (stop.IsCancellationRequested) { return; }
+              catch (IOException) { SetDetail(generation, "ошибка чтения HID; повторное подключение"); }
+              catch (UnauthorizedAccessException) { SetDetail(generation, "доступ к HID заблокирован другим приложением"); }
+              catch (Exception e) { SetDetail(generation, "HID: " + e.GetType().Name); }
+            try { await Task.Delay(TimeSpan.FromSeconds(4), stop).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
         }
-        return (null, "подходящий отчёт заряда пока не получен");
+    }
+
+    private void SetDetail(long generation, string value) {
+        lock (_gate) if (!_disposed && generation == _generation) _details = value;
+    }
+    private void SetDetailIfEmpty(long generation, string value) {
+        lock (_gate) if (!_disposed && generation == _generation && _battery is null) _details = value;
+    }
+    // Called under _gate.
+    private void StopListener() {
+        ++_generation;
+        var old = _stop;
+        var oldTask = _listener;
+        old?.Cancel();
+        if (old is not null) {
+            if (oldTask is null || oldTask.IsCompleted) old.Dispose();
+            else _ = oldTask.ContinueWith(_ => old.Dispose(), TaskScheduler.Default);
+        }
+        _stop = null;
+        _listener = null;
+    }
+    public void Dispose() {
+        lock (_gate) {
+            if (_disposed) return;
+            _disposed = true;
+            StopListener();
+        }
     }
 }
