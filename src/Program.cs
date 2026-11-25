@@ -406,6 +406,7 @@ sealed class TrayApp : ApplicationContext {
     private async Task CopyDeveloperDiagnostics() {
         try {
             _main.ShowBalloonTip(1500, "ChargeTray", "Собираем сведения HID без серийных номеров…", ToolTipIcon.Info);
+            var pollingJournal = _investigation.Report();
             var items = await Task.Run(() => {
                 var inputs = HidInput.Read();
                 var ids = inputs.Select(x => x.Hardware).Where(x =>
@@ -418,7 +419,7 @@ sealed class TrayApp : ApplicationContext {
                 }).ToArray();
                 return DiagnosticReport.Developer(Version, Environment.OSVersion.VersionString,
                     _updated, _data, _hardware, _errors, inputs, caps,
-                    _investigation.Report());
+                    pollingJournal);
             });
             if (!_exiting) CopyText(items);
         } catch (Exception e) {
