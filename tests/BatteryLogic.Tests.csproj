@@ -19,6 +19,7 @@
     <Compile Include="../src/SettingsStore.cs" Link="SettingsStore.cs" />
     <Compile Include="../src/DeviceIntelligence.cs" Link="DeviceIntelligence.cs" />
     <Compile Include="../src/ProtocolLab.cs" Link="ProtocolLab.cs" />
+    <Compile Include="../src/DeviceInvestigation.cs" Link="DeviceInvestigation.cs" />
     <Compile Include="../src/BatteryHistory.cs" Link="BatteryHistory.cs" />
     <Compile Include="../src/DeviceCatalog.cs" Link="DeviceCatalog.cs" />
     <Compile Include="../src/HidInput.cs" Link="HidInput.cs" />

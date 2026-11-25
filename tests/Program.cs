@@ -220,4 +220,19 @@ Verify(labChanges.Changes.Any(x => x.Contains("44%") && x.Contains("77%")),
 Verify(!ProtocolLab.ExportJson(labChanges).Contains("AA:BB:CC:DD:EE:FF") &&
     !ProtocolLab.ExportJson(labChanges).Contains(@"HID\VID_1234"),
     "Protocol Lab redacts MAC addresses and instance paths");
+var investigation = new DeviceInvestigation();
+for (int i = 0; i < 45; i++)
+    investigation.Observe([
+        new Accessory("test:mouse", "Test Mouse", DeviceType.Mouse,
+            "USB / ресивер", i % 100)
+    ], [], new DateTime(2026, 11, 25, 12, 0, 0, DateTimeKind.Utc).AddSeconds(i * 20));
+Verify(investigation.Count == 36, "Investigation keeps only 36 observations in memory");
+Verify(investigation.Report().Contains("Опросов: 36") &&
+    investigation.Report().Contains("Test Mouse"), "One-click diagnostic report includes bounded poll history");
+var hint = HidCompatibilityHints.Describe([
+    new HidCompatibilityHints.Interface("25A7:FA07", "01", "07", 0xFF02, 0x0002, 0, 0, 17),
+    new HidCompatibilityHints.Interface("1D57:FA60", "02", "04", 0x000B, 0x0000, 0, 0, 132)
+]);
+Verify(hint.Contains("FEATURE=17") && hint.Contains("25A7:FA07") &&
+    hint.Contains("1D57:FA60"), "Report identifies promising HID collections without inferring a battery percentage");
 Console.WriteLine($"{assertions} checks passed.");

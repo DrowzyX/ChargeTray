@@ -24,7 +24,8 @@ internal static class DiagnosticReport {
 
     internal static string Developer(string version, string os, DateTime? refreshed,
         IEnumerable<Accessory> devices, IEnumerable<string> hardwareLines, IEnumerable<string> errors,
-        IEnumerable<HidInput.Input> inputs, IEnumerable<(string Path, RazerReceiver.Caps? Caps)> collections) {
+        IEnumerable<HidInput.Input> inputs, IEnumerable<(string Path, RazerReceiver.Caps? Caps)> collections,
+        string? samplingJournal = null) {
         var b = new StringBuilder(Summary(version, os, refreshed, devices, errors))
             .AppendLine().AppendLine("=== USB / HID (без серийных номеров и путей) ===");
         var groups = inputs.GroupBy(d => d.Hardware == "без VID:PID" ? d.Hardware + ":" + d.Name : d.Hardware,
@@ -60,6 +61,19 @@ internal static class DiagnosticReport {
             x.StartsWith("Xenta ", StringComparison.OrdinalIgnoreCase)).Distinct().ToArray();
         foreach (var line in protocol) b.AppendLine("• " + line);
         if (protocol.Length == 0) b.AppendLine("Нет подробных ответов от ресиверов");
+        var metadata = collections.Select(pair => {
+            var id = Regex.Match(pair.Path, @"vid_([0-9a-f]{4})&pid_([0-9a-f]{4})", RegexOptions.IgnoreCase);
+            if (!id.Success || pair.Caps is not { } c) return null;
+            string hw = (id.Groups[1].Value + ":" + id.Groups[2].Value).ToUpperInvariant();
+            var mi = Regex.Match(pair.Path, @"&mi_([0-9a-f]{2})", RegexOptions.IgnoreCase).Groups[1].Value;
+            var col = Regex.Match(pair.Path, @"&col([0-9a-f]{2})", RegexOptions.IgnoreCase).Groups[1].Value;
+            return new HidCompatibilityHints.Interface(hw, mi.Length > 0 ? mi.ToUpperInvariant() : "—",
+                col.Length > 0 ? col.ToUpperInvariant() : "—",
+                c.Page, c.Usage, c.Input, c.Output, c.Feature);
+        }).Where(x => x is not null).Cast<HidCompatibilityHints.Interface>().ToArray();
+        b.AppendLine().AppendLine(HidCompatibilityHints.Describe(metadata));
+        if (!string.IsNullOrWhiteSpace(samplingJournal))
+            b.AppendLine().AppendLine(samplingJournal);
         b.AppendLine().AppendLine("Отчёт использует только метаданные HID. Не отправляйте серийные номера, MAC-адреса или сырые пути устройств.");
         return b.ToString();
     }
