@@ -14,6 +14,8 @@ internal static class DeviceCatalog {
         ["258A:0049"] = new() { Name = "Gaming Keyboard (258A:0049)", Type = "Keyboard" },
         ["062A:38CC"] = new() { Name = "2.4G Keyboard/Mouse Receiver (062A:38CC)", Type = "Keyboard" },
         ["A8A5:2255"] = new() { Name = "YJX Wireless Mouse Receiver (A8A5:2255)", Type = "Mouse" },
+        ["25A7:FA07"] = new() { Name = "Redragon/Areson Wireless Mouse (25A7:FA07)", Type = "Mouse" },
+        ["25A7:FA08"] = new() { Name = "Redragon/Areson Wired Mouse (25A7:FA08)", Type = "Mouse" },
         ["1D57:FA60"] = new() { Name = "Беспроводная мышь (1D57:FA60)", Type = "Mouse" },
         ["05AC:024F"] = new() { Name = "AULA F108 Pro", Type = "Keyboard" },
         ["1532:0083"] = new() { Name = "Razer Basilisk X HyperSpeed", Type = "Mouse" }
