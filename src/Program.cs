@@ -63,6 +63,7 @@ sealed class TrayApp : ApplicationContext {
     private DateTime? _updated;
     private string[] _errors = [];
     private string[] _hardware = [];
+    private readonly DeviceInvestigation _investigation = new();
     private static readonly string Settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChargeTray", "single-icon-v2");
 
     private static readonly string HideStripSettings = Path.Combine(Path.GetDirectoryName(Settings)!, "hide-strip-v3");
@@ -276,6 +277,7 @@ sealed class TrayApp : ApplicationContext {
             _seenFirstScan = true;
             if (_prefs.Values.BatteryHistory) _history.Observe(_data);
             _updated = DateTime.Now;
+            if (!_demo) _investigation.Observe(_data, _errors, DateTime.UtcNow);
             RenderTray();
             if (_hub?.Visible == true) _hub.UpdateDevices(_data, _updated, _hardware);
             if (!_demo) NotifyLow();
@@ -415,7 +417,8 @@ sealed class TrayApp : ApplicationContext {
                     return (Path: path, Caps: RazerReceiver.GetCaps(handle));
                 }).ToArray();
                 return DiagnosticReport.Developer(Version, Environment.OSVersion.VersionString,
-                    _updated, _data, _hardware, _errors, inputs, caps);
+                    _updated, _data, _hardware, _errors, inputs, caps,
+                    _investigation.Report());
             });
             if (!_exiting) CopyText(items);
         } catch (Exception e) {
