@@ -593,15 +593,18 @@ internal sealed class DeviceHubForm : Form {
     }
     private void BuildDiagnostics() {
         _diagnosticsList.Controls.Clear();
-        var report = Group("Диагностика устройств", "Компактный и технический отчёты для совместимости HID.", 205);
+        var report = Group("Автоматическая диагностика устройств",
+            "ChargeTray собирает безопасные сведения во время работы. Никаких дополнительных программ.", 232);
         var summary = new FluentButton("Скопировать краткий отчёт") {
             Left = 20, Top = 89, Width = 290, Height = 43 };
         summary.Click += (_, _) => CopySummaryRequested?.Invoke();
         report.Controls.Add(summary);
-        var detailed = new FluentButton("Скопировать HID-отчёт") {
-            Left = 20, Top = 145, Width = 290, Height = 43 };
+        var detailed = new FluentButton("Скопировать полный отчёт совместимости") {
+            Left = 20, Top = 145, Width = 395, Height = 43 };
         detailed.Click += (_, _) => CopyDeveloperRequested?.Invoke();
         report.Controls.Add(detailed);
+        report.Controls.Add(Label("В отчёт включены USB/HID-коллекции, возможные источники батареи, ошибки и 36 последних опросов.",
+            22, 195, 610, 22, 9, muted: true));
         _diagnosticsList.Controls.Add(report);
 
         var support = Group("Поддержка нового устройства",
