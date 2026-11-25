@@ -220,4 +220,10 @@ Verify(labChanges.Changes.Any(x => x.Contains("44%") && x.Contains("77%")),
 Verify(!ProtocolLab.ExportJson(labChanges).Contains("AA:BB:CC:DD:EE:FF") &&
     !ProtocolLab.ExportJson(labChanges).Contains(@"HID\VID_1234"),
     "Protocol Lab redacts MAC addresses and instance paths");
+Verify(DeviceCatalog.TryGet("25A7:FA07", out var redragonReceiver) &&
+    DeviceCatalog.Type(redragonReceiver, DeviceType.Keyboard) == DeviceType.Mouse,
+    "Redragon/Areson wireless receiver is classified as mouse, not keyboard");
+Verify(DeviceCatalog.TryGet("25A7:FA08", out var redragonWired) &&
+    DeviceCatalog.Type(redragonWired, DeviceType.Keyboard) == DeviceType.Mouse,
+    "Redragon/Areson wired connection is classified as mouse");
 Console.WriteLine($"{assertions} checks passed.");
