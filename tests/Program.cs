@@ -235,4 +235,9 @@ var hint = HidCompatibilityHints.Describe([
 ]);
 Verify(hint.Contains("FEATURE=17") && hint.Contains("25A7:FA07") &&
     hint.Contains("1D57:FA60"), "Report identifies promising HID collections without inferring a battery percentage");
+Verify(DeviceCatalog.TryGet("25A7:FA07", out var stormProfile) &&
+    DeviceCatalog.Type(stormProfile, DeviceType.Keyboard) == DeviceType.Mouse,
+    "25A7:FA07 is a mouse even when Windows reports a Keyboard HID role");
+Verify(stormProfile.Name.Contains("Redragon", StringComparison.OrdinalIgnoreCase),
+    "25A7:FA07 identifies Redragon family and remains unambiguous in diagnostics");
 Console.WriteLine($"{assertions} checks passed.");
