@@ -704,6 +704,10 @@ internal sealed class DeviceHubForm : Form {
             }
         }
     }
+    internal void RefreshAppearance() {
+        if (!IsDisposed && !Disposing) ApplyThemeToWindow();
+    }
+
     private void ApplyThemeToWindow() {
         BackColor = FluentStyle.Background;
         try {
