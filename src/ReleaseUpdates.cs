@@ -9,33 +9,58 @@ namespace ChargeTray;
 internal static class ReleaseUpdates {
     internal sealed record Release(string Tag, string Url, string? AssetUrl, string? AssetName, string? Digest);
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(22) };
-    private const string Api = "https://api.github.com/repos/DrowzyX/ChargeTray/releases/latest";
+    // Releases/latest omits prereleases. ChargeTray preview users must be able
+    // to see newer tested preview builds as well as future stable releases.
+    private const string Api = "https://api.github.com/repos/DrowzyX/ChargeTray/releases?per_page=20";
 
     internal static async Task<Release?> Check(CancellationToken cancellation = default) {
         using var req = new HttpRequestMessage(HttpMethod.Get, Api);
-        req.Headers.UserAgent.Add(new ProductInfoHeaderValue("ChargeTray", "2.0"));
+        req.Headers.UserAgent.Add(new ProductInfoHeaderValue("ChargeTray", "2.3"));
         req.Headers.Accept.ParseAdd("application/vnd.github+json");
         using var response = await Client.SendAsync(req, cancellation);
         if (!response.IsSuccessStatusCode) return null;
         await using var stream = await response.Content.ReadAsStreamAsync(cancellation);
         using var json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellation);
-        var root = json.RootElement;
-        var tag = root.GetProperty("tag_name").GetString() ?? "";
-        var url = root.GetProperty("html_url").GetString() ?? "";
-        string? assetUrl = null, name = null, digest = null;
-        if (root.TryGetProperty("assets", out var assets))
+        return SelectBest(json.RootElement);
+    }
+
+    internal static Release? SelectBest(JsonElement releases) {
+        if (releases.ValueKind != JsonValueKind.Array) return null;
+        var available = new List<(Version Version, Release Release)>();
+        foreach (var item in releases.EnumerateArray()) {
+            if (item.TryGetProperty("draft", out var draft) && draft.GetBoolean()) continue;
+            if (!item.TryGetProperty("tag_name", out var tagField)) continue;
+            string tag = tagField.GetString() ?? "";
+            if (!Version.TryParse(tag.TrimStart('v', 'V').Split('-', '+')[0], out var version)) continue;
+            string url = item.TryGetProperty("html_url", out var pageField) ?
+                pageField.GetString() ?? "" : "";
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var page) ||
+                page.Host != "github.com" ||
+                !page.AbsolutePath.StartsWith("/DrowzyX/ChargeTray/releases/", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!item.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+                continue;
             foreach (var asset in assets.EnumerateArray()) {
-                string filename = asset.GetProperty("name").GetString() ?? "";
-                if (!filename.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
-                    !filename.Contains("win-x64", StringComparison.OrdinalIgnoreCase)) continue;
-                name = filename;
-                assetUrl = asset.GetProperty("browser_download_url").GetString();
-                digest = asset.TryGetProperty("digest", out var hash) ? hash.GetString() : null;
+                string name = asset.TryGetProperty("name", out var nameField) ?
+                    nameField.GetString() ?? "" : "";
+                if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+                    !name.Contains("win-x64", StringComparison.OrdinalIgnoreCase)) continue;
+                string? assetUrl = asset.TryGetProperty("browser_download_url", out var download)
+                    ? download.GetString() : null;
+                if (!Uri.TryCreate(assetUrl, UriKind.Absolute, out var uri) ||
+                    uri.Scheme != "https" || uri.Host != "github.com" ||
+                    !uri.AbsolutePath.StartsWith("/DrowzyX/ChargeTray/releases/download/", StringComparison.Ordinal))
+                    continue;
+                string? digest = asset.TryGetProperty("digest", out var hash) ? hash.GetString() : null;
+                available.Add((version, new Release(tag, url, assetUrl, name, digest)));
                 break;
             }
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var page) || page.Host != "github.com")
-            return null;
-        return new(tag, url, assetUrl, name, digest);
+        }
+        // A semantically higher version wins; prefer stable over preview at
+        // equal version numbers to avoid downgrading an installed stable build.
+        return available.OrderByDescending(x => x.Version)
+            .ThenBy(x => x.Release.Tag.Contains('-') ? 1 : 0)
+            .Select(x => x.Release).FirstOrDefault();
     }
 
     internal static bool IsNewer(string? tag, Version current) {
