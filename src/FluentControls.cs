@@ -89,7 +89,7 @@ internal sealed class FluentButton : Control {
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(FluentStyle.Surface);
+        g.Clear(Parent is FluentCard ? FluentStyle.Surface : FluentStyle.Background);
         Color accent = AccentTheme.Accent;
         Color bg = !Enabled ? FluentStyle.SurfaceHover :
             Selected || Primary ? (FluentStyle.IsDark ? Color.FromArgb(49, 58, 74) : Color.FromArgb(225, 234, 249)) :
