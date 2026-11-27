@@ -777,7 +777,9 @@ internal sealed class BatteryProgress : Control {
     }
     protected override void OnPaint(PaintEventArgs e) {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        FluentStyle.DrawRounded(e.Graphics, ClientRectangle, Color.FromArgb(70, 76, 90), 4, false);
+        e.Graphics.Clear(FluentStyle.Surface);
+        FluentStyle.DrawRounded(e.Graphics, ClientRectangle,
+            FluentStyle.IsDark ? Color.FromArgb(70, 76, 90) : Color.FromArgb(215, 222, 233), 4, false);
         if (Percent is not int n || n <= 0) return;
         var bounds = new Rectangle(0, 0, Math.Max(5, (int)Math.Round(Width * n / 100d)), Height);
         FluentStyle.DrawRounded(e.Graphics, bounds,
@@ -793,7 +795,9 @@ internal sealed class BatteryChart : Control {
     }
     protected override void OnPaint(PaintEventArgs e) {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        FluentStyle.DrawRounded(e.Graphics, ClientRectangle, Color.FromArgb(39, 44, 55), 8, false);
+        e.Graphics.Clear(FluentStyle.Surface);
+        FluentStyle.DrawRounded(e.Graphics, ClientRectangle,
+            FluentStyle.IsDark ? Color.FromArgb(39, 44, 55) : Color.FromArgb(231, 236, 245), 8, false);
         if (_samples.Length < 2) return;
         double range = (_samples[^1].Utc - _samples[0].Utc).TotalSeconds;
         if (range <= 0) return;
