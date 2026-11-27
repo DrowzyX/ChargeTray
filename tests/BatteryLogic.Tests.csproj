@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="../src/BatteryModel.cs" Link="BatteryModel.cs" />
     <Compile Include="../src/RazerBatteryPacket.cs" Link="RazerBatteryPacket.cs" />
+    <Compile Include="../src/RedragonPowerPacket.cs" Link="RedragonPowerPacket.cs" />
+    <Compile Include="../src/CommunityDevices.cs" Link="CommunityDevices.cs" />
     <Compile Include="../src/AulaBatteryPacket.cs" Link="AulaBatteryPacket.cs" />
     <Compile Include="../src/WindowsBattery.cs" Link="WindowsBattery.cs" />
     <Compile Include="../src/RazerModels.cs" Link="RazerModels.cs" />

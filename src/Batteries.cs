@@ -19,6 +19,7 @@ sealed class BatteryReader : IDisposable {
     private readonly AulaPowerTracker _aulaPower = new();
     private bool _aulaWasConnected;
     private readonly XentaReceiver _xenta = new();
+    private readonly RedragonPowerReader _redragon = new();
     internal bool RetryAulaSoon => _aula.RetrySoon;
     private readonly Dictionary<string, (DateTime Next, int? Value, string? Model)> _ble = new();
     private static readonly SemaphoreSlim RadioReads = new(3);
@@ -44,6 +45,7 @@ sealed class BatteryReader : IDisposable {
         }).ToArray();
         var aulaTask = _aula.Read(force, hid.Any(AulaF108.IsKnownInput));
         var xentaTask = _xenta.Read(force);
+        var redragonTask = _redragon.Read(force);
         var classic = BluetoothDevices(false, force);
         var ble = BluetoothDevices(true, force);
         await Task.WhenAll(classic, ble);
@@ -88,12 +90,21 @@ sealed class BatteryReader : IDisposable {
         catch (Exception e) { Errors.Add($"AULA HID: {e.GetType().Name}"); }
         HardwareDiagnostics = hid.Select(x => x.Diagnostic).Distinct().ToArray();
         var xenta = await xentaTask;
+        var redragon = await redragonTask;
+        if (redragon.Found)
+            HardwareDiagnostics = [..HardwareDiagnostics,
+                "Redragon / Areson 25A7:FA07/FA08 | " + redragon.Detail];
         if (xenta.Found) HardwareDiagnostics = [..HardwareDiagnostics, $"Xenta 2.4 ГГц | 1D57:FA60 | {xenta.Details}"];
         var reserved = razerIds.Concat(aula.Receiver ? new[] { AulaF108.Id } : Array.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (xenta.Found) reserved.Add("1D57:FA60");
+        if (redragon.Found) { reserved.Add("25A7:FA07"); reserved.Add("25A7:FA08"); }
         connected.AddRange(CommunityDevices.Identify(hid, reserved));
         if (xenta.Found) connected.Add(new("xenta:1d57:fa60", "Беспроводная мышь (1D57:FA60)", DeviceType.Mouse,
             xenta.Level.HasValue ? "Донгл 2,4 ГГц" : "Донгл найден · нет подтверждённого заряда", xenta.Level));
+        if (redragon.Found)
+            connected.Add(new("redragon:25a7:fa07", "Redragon / Areson Wireless Mouse", DeviceType.Mouse,
+                redragon.Percent.HasValue ? "Донгл 2,4 ГГц" : "Ресивер найден · GetPower без подтверждённого ответа",
+                redragon.Percent, Charging: redragon.Charging, Detail: redragon.Detail));
         connected.AddRange(hid.Where(x => x.Transport != "Bluetooth HID" && x.Percent.HasValue &&
             !razerIds.Contains(x.Hardware) && !CommunityDevices.Known(x) &&
             !(aula.Receiver && AulaF108.IsKnownInput(x)))

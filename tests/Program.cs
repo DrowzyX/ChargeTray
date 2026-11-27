@@ -240,4 +240,45 @@ Verify(DeviceCatalog.TryGet("25A7:FA07", out var stormProfile) &&
     "25A7:FA07 is a mouse even when Windows reports a Keyboard HID role");
 Verify(stormProfile.Name.Contains("Redragon", StringComparison.OrdinalIgnoreCase),
     "25A7:FA07 identifies Redragon family and remains unambiguous in diagnostics");
+// Redragon 25A7:FA07 - authenticated GetPower; never fabricate the OEM percentage.
+Verify(Convert.ToHexString(RedragonPowerPacket.Query()) ==
+    "0804000000000000000000000000000049", "GetPower request has known safe command and checksum");
+byte[] r40 = Convert.FromHexString("0904000000020400000000000000000042");
+Verify(RedragonPowerPacket.Decode(r40) is { Percent: 40, Charging: false },
+    "17-byte FF01 GetPower response decodes verified 40% battery");
+byte[] r80 = Convert.FromHexString("090400000002080000000000000000003E");
+Verify(RedragonPowerPacket.Decode(r80) is { Percent: 80, Charging: false },
+    "Areson FA07 battery unit is 10 percent");
+byte[] chargingR40 = Convert.FromHexString("0904000000020401000000000000000041");
+Verify(RedragonPowerPacket.Decode(chargingR40) is { Percent: 40, Charging: true },
+    "Charging status only comes from validated GetPower reply");
+var tampered = (byte[])r40.Clone(); tampered[16] = 0;
+Verify(RedragonPowerPacket.Decode(tampered) is null,
+    "Corrupted Redragon checksum must not show a battery");
+var wrongStatus = (byte[])r40.Clone(); wrongStatus[2] = 3;
+Verify(RedragonPowerPacket.Decode(wrongStatus) is null,
+    "Unconfirmed Redragon packet status must not show a battery");
+var wrongLevel = (byte[])r40.Clone(); wrongLevel[6] = 99;
+Verify(RedragonPowerPacket.Decode(wrongLevel) is null,
+    "Invalid 99 tens-of-percent cannot be accepted");
+var redragonComposite = new HidInput.Input("test", DeviceType.Keyboard, "2.4G Wireless Receiver",
+    "USB / ресивер", "25A7:FA07", null);
+Verify(CommunityDevices.Type(redragonComposite) == DeviceType.Mouse,
+    "Known Redragon mouse is not misclassified when Windows exposes Keyboard first");
+Verify(CommunityDevices.Identify([redragonComposite], new HashSet<string>())[0].Type == DeviceType.Mouse,
+    "Community fallback preserves Mouse type");
+// Preview releases must be discoverable even when GitHub /latest points to an old stable.
+using (var releaseJson = System.Text.Json.JsonDocument.Parse("""
+[
+ {"tag_name":"v2.2.2","html_url":"https://github.com/DrowzyX/ChargeTray/releases/tag/v2.2.2",
+  "draft":false,"assets":[{"name":"ChargeTray-2.2.2-win-x64.zip",
+  "browser_download_url":"https://github.com/DrowzyX/ChargeTray/releases/download/v2.2.2/ChargeTray-2.2.2-win-x64.zip"}]},
+ {"tag_name":"v2.3.0-preview.1","html_url":"https://github.com/DrowzyX/ChargeTray/releases/tag/v2.3.0-preview.1",
+  "draft":false,"assets":[{"name":"ChargeTray-2.3.0-preview-win-x64.zip",
+  "browser_download_url":"https://github.com/DrowzyX/ChargeTray/releases/download/v2.3.0-preview.1/ChargeTray-2.3.0-preview-win-x64.zip"}]}
+]
+""")) {
+    Verify(ReleaseUpdates.SelectBest(releaseJson.RootElement)?.Tag == "v2.3.0-preview.1",
+        "Updater selects newer previews when /latest would omit them");
+}
 Console.WriteLine($"{assertions} checks passed.");

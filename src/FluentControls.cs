@@ -52,7 +52,9 @@ internal static class FluentStyle {
 internal sealed class FluentCard : Panel {
     internal FluentCard() {
         DoubleBuffered = true;
-        BackColor = FluentStyle.Background;
+        // Transparent labels sample Control.BackColor rather than custom painted pixels.
+        // Match it to the actual card surface to avoid dark/light rectangular halos.
+        BackColor = FluentStyle.Surface;
         Padding = new Padding(17);
         Margin = new Padding(0, 0, 0, 13);
         ResizeRedraw = true;
@@ -87,6 +89,7 @@ internal sealed class FluentButton : Control {
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Parent is FluentCard ? FluentStyle.Surface : FluentStyle.Background);
         Color accent = AccentTheme.Accent;
         Color bg = !Enabled ? FluentStyle.SurfaceHover :
             Selected || Primary ? (FluentStyle.IsDark ? Color.FromArgb(49, 58, 74) : Color.FromArgb(225, 234, 249)) :
@@ -142,6 +145,7 @@ internal sealed class FluentToggle : Control {
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(FluentStyle.Surface);
         TextRenderer.DrawText(g, Text, Font, new Rectangle(3, 0, Width - 74, Height),
             FluentStyle.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         var track = new Rectangle(Width - 59, (Height - 25) / 2, 49, 25);
@@ -169,6 +173,6 @@ internal static class UiElements {
     internal static Label Label(string value, float size = 10, bool bold = false, bool muted = false) =>
         new() { Text = value, Font = FluentStyle.Font(size, bold),
             ForeColor = muted ? FluentStyle.Muted : FluentStyle.Text, AutoSize = false,
-            BackColor = Color.Transparent };
+            Tag = muted ? "muted" : "normal", BackColor = Color.Transparent };
     internal static Panel Bar(int height = 6) => new() { Height = height, BackColor = Color.FromArgb(61, 68, 81) };
 }

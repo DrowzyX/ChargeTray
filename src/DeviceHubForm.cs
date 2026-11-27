@@ -237,9 +237,10 @@ internal sealed class DeviceHubForm : Form {
         if (d.Charging || d.Key == "aula:f108-pro") {
             var status = Label(d.Charging ? "⚡ Заряжается (подтверждено устройством)" :
                 (d.Detail ?? "Статус зарядки неизвестен"), 74, 68, 510, 20, 9, muted: true);
-            status.ForeColor = d.Charging ? Color.FromArgb(115, 230, 166) :
-                d.UsbConnected ? AccentTheme.Accent :
-                d.Detail?.StartsWith("⚡?") == true ? AccentTheme.Accent : FluentStyle.Muted;
+            bool highlightPower = d.Charging || d.UsbConnected ||
+                d.Detail?.StartsWith("⚡?") == true;
+            status.Tag = highlightPower ? "accent" : "muted";
+            status.ForeColor = highlightPower ? AccentTheme.Accent : FluentStyle.Muted;
             card.Controls.Add(status);
             card.Resize += (_, _) => status.Width = Math.Max(180, card.ClientSize.Width - 95);
         }
@@ -703,45 +704,52 @@ internal sealed class DeviceHubForm : Form {
             }
         }
     }
+    internal void RefreshAppearance() {
+        if (!IsDisposed && !Disposing) ApplyThemeToWindow();
+    }
+
     private void ApplyThemeToWindow() {
         BackColor = FluentStyle.Background;
         try {
             int dark = FluentStyle.IsDark ? 1 : 0;
             _ = DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int));
         } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
-        _sidebar.BackColor = FluentStyle.Background;
-        _title.ForeColor = FluentStyle.Text;
-        _subtitle.ForeColor = FluentStyle.Muted;
-        foreach (Control sidebarChild in _sidebar.Controls)
-            if (sidebarChild is Label label) label.ForeColor = FluentStyle.Text;
-        _header.BackColor = FluentStyle.Background;
-        _content.BackColor = FluentStyle.Background;
-        foreach (var page in _pages.Values) page.BackColor = FluentStyle.Background;
-        _deviceLayout.BackColor = FluentStyle.Background;
-        _deviceStatus.BackColor = FluentStyle.Background;
-        _deviceStatus.ForeColor = FluentStyle.Muted;
-        foreach (var flow in new[] {_deviceList,_historyList,_styleList,_settingsList,_diagnosticsList,_labList}) {
-            flow.BackColor = FluentStyle.Background;
-            foreach (Control card in flow.Controls) {
-                if (card is FluentCard) {
-                    card.BackColor = FluentStyle.Background;
-                    foreach (Control child in card.Controls) {
-                        if (child is Label label) label.ForeColor = FluentStyle.Text;
-                        if (child is TextBox box) { box.BackColor = FluentStyle.SurfaceHover; box.ForeColor = FluentStyle.Text; }
-                        if (child is NumericUpDown number) { number.BackColor = FluentStyle.SurfaceHover; number.ForeColor = FluentStyle.Text; }
-                    }
-                }
-                foreach (Control nested in card.Controls) {
-                    if (nested is FlowLayoutPanel palettePanel) {
-                        palettePanel.BackColor = FluentStyle.Surface;
-                        foreach (Control chip in palettePanel.Controls) chip.Invalidate();
-                    }
-                }
-                card.Invalidate(true);
-            }
+        RefreshThemeTree(this);
+        foreach (var chip in _colorChips) {
+            chip.Selected = !AccentTheme.RgbEnabled && !AccentTheme.SystemAccentEnabled &&
+                chip.BaseColor.ToArgb() == AccentTheme.Fixed.ToArgb();
+            chip.Invalidate();
         }
-        foreach (var chip in _colorChips) chip.Invalidate();
         Invalidate(true);
+    }
+
+    // One recursive pass also handles nested palette panels and Protocol Lab.
+    // Previously only direct controls were themed, causing white canvases,
+    // black rectangles behind transparent labels and stale subtitle colors.
+    private static void RefreshThemeTree(Control control) {
+        if (control is FluentCard)
+            control.BackColor = FluentStyle.Surface;
+        else if (control is FlowLayoutPanel)
+            control.BackColor = control.Parent is FluentCard ? FluentStyle.Surface : FluentStyle.Background;
+        else if (control is Panel or TableLayoutPanel)
+            control.BackColor = control.Parent is FluentCard ? FluentStyle.Surface : FluentStyle.Background;
+        else if (control is Label label)
+            label.ForeColor = label.Tag as string switch {
+                "muted" => FluentStyle.Muted,
+                "accent" => AccentTheme.Accent,
+                _ => FluentStyle.Text
+            };
+        else if (control is TextBox box) {
+            box.BackColor = FluentStyle.SurfaceHover;
+            box.ForeColor = FluentStyle.Text;
+        } else if (control is NumericUpDown num) {
+            num.BackColor = FluentStyle.SurfaceHover;
+            num.ForeColor = FluentStyle.Text;
+        }
+        if (control is FluentButton or FluentToggle or FluentColorChip or DeviceGlyphIcon)
+            control.ForeColor = FluentStyle.Text;
+        foreach (Control child in control.Controls) RefreshThemeTree(child);
+        control.Invalidate();
     }
 
     [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -773,7 +781,9 @@ internal sealed class BatteryProgress : Control {
     }
     protected override void OnPaint(PaintEventArgs e) {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        FluentStyle.DrawRounded(e.Graphics, ClientRectangle, Color.FromArgb(70, 76, 90), 4, false);
+        e.Graphics.Clear(FluentStyle.Surface);
+        FluentStyle.DrawRounded(e.Graphics, ClientRectangle,
+            FluentStyle.IsDark ? Color.FromArgb(70, 76, 90) : Color.FromArgb(215, 222, 233), 4, false);
         if (Percent is not int n || n <= 0) return;
         var bounds = new Rectangle(0, 0, Math.Max(5, (int)Math.Round(Width * n / 100d)), Height);
         FluentStyle.DrawRounded(e.Graphics, bounds,
@@ -789,7 +799,9 @@ internal sealed class BatteryChart : Control {
     }
     protected override void OnPaint(PaintEventArgs e) {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        FluentStyle.DrawRounded(e.Graphics, ClientRectangle, Color.FromArgb(39, 44, 55), 8, false);
+        e.Graphics.Clear(FluentStyle.Surface);
+        FluentStyle.DrawRounded(e.Graphics, ClientRectangle,
+            FluentStyle.IsDark ? Color.FromArgb(39, 44, 55) : Color.FromArgb(231, 236, 245), 8, false);
         if (_samples.Length < 2) return;
         double range = (_samples[^1].Utc - _samples[0].Utc).TotalSeconds;
         if (range <= 0) return;

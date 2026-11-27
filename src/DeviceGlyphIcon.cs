@@ -17,6 +17,7 @@ internal sealed class DeviceGlyphIcon : Control {
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(FluentStyle.Surface);
         FluentStyle.DrawRounded(g, new Rectangle(0, 0, Width - 1, Height - 1),
             FluentStyle.SurfaceHover, 11, false);
         float side = Math.Min(25f, Math.Min(Width, Height) * .65f);

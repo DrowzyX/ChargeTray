@@ -478,6 +478,7 @@ sealed class TrayApp : ApplicationContext {
         _panel.Invalidate();
         _strip.Invalidate();
         _island.Invalidate();
+        if (_hub is { IsDisposed: false }) _hub.RefreshAppearance();
     }
 
     private static string Trim(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
